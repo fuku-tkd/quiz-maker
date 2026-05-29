@@ -1008,6 +1008,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       <div class="card" style="text-align:center;">
         <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解':'不正解'}</h2>
         ${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
+        ${correct ? `<div style="color:var(--sub); margin-bottom:10px; font-size:16px;">1秒後に次の問題に進みます</div>` : ''}
         
         <div style="margin: 20px 0; padding: 12px; background: rgba(0,0,0,0.02); border-radius:12px; font-size:15px;">
           現在の記憶度: <b>${memorizeSuccessLogs[currentMemorizeQuestion.originalIdx]} / 3 回正解</b><br>
@@ -1023,17 +1024,24 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const nextBtn = appArea.querySelector("#nextBtn");
     if(nextBtn) setTimeout(()=>{ nextBtn.focus(); }, 20);
 
-    nextBtn.onclick = () => {
-      window.removeEventListener("keydown", handleEnterNext);
-      if(sessionAnsweredCount >= 5) {
-        sessionAnsweredCount = 0; 
-        showMemorizeProgressGraph();
-      } else {
-        showMemorizeQuestion();
-      }
-    };
-
+    nextBtn.onclick = handleMemorizeNextStep;
     window.addEventListener("keydown", handleEnterNext);
+
+    // 正解の時は1秒後に自動遷移を予約
+    if(correct) {
+      nextTimer = setTimeout(handleMemorizeNextStep, 1000);
+    }
+  }
+
+  function handleMemorizeNextStep() {
+    window.removeEventListener("keydown", handleEnterNext);
+    clearTimeout(nextTimer);
+    if(sessionAnsweredCount >= 5) {
+      sessionAnsweredCount = 0; 
+      showMemorizeProgressGraph();
+    } else {
+      showMemorizeQuestion();
+    }
   }
 
   function showMemorizeProgressGraph() {
@@ -1224,14 +1232,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function handleEnterNext(e){
     if(e.key === "Enter"){
       e.preventDefault();
-      window.removeEventListener("keydown", handleEnterNext);
       if(isMemorizeMode) {
-        if(sessionAnsweredCount >= 5) {
-          sessionAnsweredCount = 0;
-          showMemorizeProgressGraph();
-        } else {
-          showMemorizeQuestion();
-        }
+        handleMemorizeNextStep();
       } else {
         nextQuestion();
       }
