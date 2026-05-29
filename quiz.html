@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>精度重視・暗記学習ツール</title>
+<title>精度重視・暗記学習ツール (問題集折りたたみ版)</title>
 
 <style>
 :root{
@@ -54,7 +54,7 @@ h1{
 
 h2{
   font-size:18px;
-  margin:0 0 16px 0;
+  margin:0;
   color:var(--sub);
   font-weight:bold;
 }
@@ -69,12 +69,31 @@ h2{
   position: relative;
 }
 
-/* --- 改良：1行ずつの問題集リストUI --- */
+/* --- 改良：問題集選択カード自体の折りたたみヘッダー --- */
+.quiz-select-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.quiz-select-body {
+  max-height: 1000px; /* 十分な高さ */
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+  margin-top: 16px;
+}
+.card.collapsed .quiz-select-body {
+  max-height: 0;
+  margin-top: 0;
+}
+
+/* 1行ずつの問題集リストUI */
 .quiz-list-container {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 10px;
 }
 
 .quiz-row-item {
@@ -87,7 +106,7 @@ h2{
 
 .quiz-row-item.active {
   border-color: var(--primary);
-  background: rgba(99,102,241,0.01);
+  background: rgba(99,102,241,0.02);
 }
 
 .quiz-row-header {
@@ -108,7 +127,6 @@ h2{
   flex-direction: column;
   gap: 4px;
   flex-grow: 1;
-  margin-right: 12px;
 }
 
 .quiz-row-title {
@@ -126,13 +144,7 @@ h2{
   color: var(--sub);
 }
 
-.quiz-action-btns {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 選択バッジ */
+/* 選択中バッジ */
 .select-status-badge {
   background: var(--primary);
   color: white;
@@ -146,7 +158,7 @@ h2{
   display: inline-block;
 }
 
-/* トグル（^）ボタン */
+/* 全体共通のトグル（^）ボタン */
 .toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -165,30 +177,6 @@ h2{
 .toggle-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
-}
-
-/* アコーディオン展開部分 */
-.quiz-row-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.25s ease-out;
-  background: rgba(0, 0, 0, 0.01);
-  border-top: 0px solid transparent;
-}
-.quiz-row-item.open .quiz-row-body {
-  max-height: 500px; /* 十分な高さ */
-  border-top: 1px dashed var(--border);
-}
-
-.accordion-inner {
-  padding: 16px 20px;
-}
-
-.accordion-unit-title {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--sub);
-  margin-bottom: 6px;
 }
 
 /* 振動アニメーション */
@@ -219,6 +207,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   display:flex;
   flex-wrap:wrap;
   gap:10px;
+  margin-top: 14px;
 }
 
 .select-btn{
@@ -243,7 +232,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .unit-row-label {
@@ -471,10 +460,15 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 <h1>暗記学習システム</h1>
 
 <div class="card" id="quizSelectCard">
-  <h2>問題集を選択</h2>
-  <div class="quiz-list-container" id="quizGrid">
-    <div style="text-align: center; color: var(--sub); padding: 20px;">
-      ⏳ クラウドから問題集をロード中...
+  <div class="quiz-select-header" id="mainQuizToggleHeader">
+    <h2>📚 問題集を選択</h2>
+    <button class="toggle-btn" id="mainQuizToggleBtn" title="問題集リストを開閉">∨</button>
+  </div>
+  <div class="quiz-select-body" id="mainQuizSelectBody">
+    <div class="quiz-list-container" id="quizGrid">
+      <div style="text-align: center; color: var(--sub); padding: 20px;">
+        ⏳ クラウドから問題集をロード中...
+      </div>
     </div>
   </div>
 </div>
@@ -528,8 +522,23 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   const appArea = document.getElementById("app");
   const quizGrid = document.getElementById("quizGrid");
+  const quizSelectCard = document.getElementById("quizSelectCard");
+  const mainQuizToggleHeader = document.getElementById("mainQuizToggleHeader");
+  const mainQuizToggleBtn = document.getElementById("mainQuizToggleBtn");
 
   document.getElementById("modalCloseBtn").onclick = hideModal;
+
+  // 問題集選択エリア全体の開閉ロジック
+  mainQuizToggleHeader.onclick = () => {
+    const isCollapsed = quizSelectCard.classList.contains("collapsed");
+    if (isCollapsed) {
+      quizSelectCard.classList.remove("collapsed");
+      mainQuizToggleBtn.textContent = "∨";
+    } else {
+      quizSelectCard.classList.add("collapsed");
+      mainQuizToggleBtn.textContent = "^";
+    }
+  };
 
   window.addEventListener("DOMContentLoaded", fetchQuizList);
   window.addEventListener("DOMContentLoaded", loadGlobalCount);
@@ -542,7 +551,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     localStorage.setItem("userQuizTotalCount", totalCountGlobal);
   }
 
-  // クラウドから問題集一覧を取得して1行ずつのアコーディオンUIとして配置
+  // クラウドから問題集一覧を取得して1行ずつのリストとして配置
   async function fetchQuizList() {
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
@@ -562,23 +571,13 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         
         let totalCorrect = 0;
         let totalCount = 0;
-        let attemptedCount = 0;
-
-        // 単元ごとの集計用
-        const unitStats = {};
 
         questions.forEach((q, idx) => {
-          const unitName = q.unit || q.status || "共通単元";
-          if(!unitStats[unitName]) unitStats[unitName] = { correct: 0, total: 0 };
-
           const log = logs[idx];
           if(log) {
             const c = log.correct || 0;
             const w = log.wrong || 0;
             if((c + w) > 0) {
-              attemptedCount++;
-              unitStats[unitName].correct += c;
-              unitStats[unitName].total += (c + w);
               totalCorrect += c;
               totalCount += (c + w);
             }
@@ -587,24 +586,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
         const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
 
-        // アコーディオン内部の単元別進捗HTMLを生成
-        let accordionUnitsHTML = "";
-        Object.keys(unitStats).forEach(uName => {
-          const us = unitStats[uName];
-          const uRate = us.total === 0 ? 0 : Math.round((us.correct / us.total) * 100);
-          if(us.total > 0) {
-            accordionUnitsHTML += `
-              <div style="margin-bottom: 10px;">
-                <div class="accordion-unit-title">■ ${escapeHtml(uName)} (正答率: ${uRate}%)</div>
-                <div class="bar-container"><div class="bar" style="width:${uRate}%"></div></div>
-              </div>
-            `;
-          }
-        });
-        if(!accordionUnitsHTML) {
-          accordionUnitsHTML = '<div style="font-size:12px; color:var(--sub);">解答データがまだありません。</div>';
-        }
-
         // 1行アイテムコンテナの作成
         const rowItem = document.createElement("div");
         rowItem.className = "quiz-row-item";
@@ -612,7 +593,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         if (quizDocId === doc.id) rowItem.classList.add("active");
 
         rowItem.innerHTML = `
-          <div class="quiz-row-header" id="header_${doc.id}">
+          <div class="quiz-row-header">
             <div class="quiz-row-left">
               <div class="quiz-row-title">
                 <span>${escapeHtml(title)}</span>
@@ -622,35 +603,15 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
                 収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
               </div>
             </div>
-            <div class="quiz-action-btns">
-              <button class="toggle-btn" id="toggle_btn_${doc.id}" title="詳細進捗を開閉">^</button>
-            </div>
-          </div>
-          <div class="quiz-row-body" id="body_${doc.id}">
-            <div class="accordion-inner">
-              <div style="font-size: 14px; font-weight:bold; margin-bottom:8px; color:var(--text);">単元別データ進捗:</div>
-              ${accordionUnitsHTML}
-            </div>
           </div>
         `;
         
-        // ヘッダー（全体）をクリックしたら問題集を選択
-        rowItem.querySelector(`.quiz-row-left`).onclick = (e) => {
+        // 1行丸ごとクリックで問題集を選択し、大枠を閉じる
+        rowItem.onclick = () => {
           selectQuiz(doc.id);
-        };
-
-        // ^ ボタンを押した時だけアコーディオンを開閉する
-        const toggleBtn = rowItem.querySelector(`#toggle_btn_${doc.id}`);
-        toggleBtn.onclick = (e) => {
-          e.stopPropagation(); // 親要素の選択イベントを発火させない
-          const isOpen = rowItem.classList.contains("open");
-          if(isOpen) {
-            rowItem.classList.remove("open");
-            toggleBtn.textContent = "^";
-          } else {
-            rowItem.classList.add("open");
-            toggleBtn.textContent = "∨";
-          }
+          // 問題集を選んだら、自動で問題集選択枠を閉じて画面をスッキリさせる
+          quizSelectCard.classList.add("collapsed");
+          mainQuizToggleBtn.textContent = "^";
         };
 
         quizGrid.appendChild(rowItem);
@@ -680,7 +641,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         if(!originalQuiz.questions) originalQuiz.questions = [];
         if(!originalQuiz.logs) originalQuiz.logs = {}; 
         
-        // 内包型 logs から各問題のリアルタイムステータスを復元
         originalQuiz.questions.forEach((q, idx) => {
           const log = originalQuiz.logs[idx] || { correct: 0, wrong: 0, history: [] };
           q.stats = { correct: log.correct || 0, wrong: log.wrong || 0 };
@@ -700,7 +660,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function showStart(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    document.getElementById("quizSelectCard").style.display = "block";
+    quizSelectCard.style.display = "block"; // 開始（設定）画面では表示する
     
     if(!originalQuiz) return;
 
@@ -824,7 +784,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       return;
     }
 
-    document.getElementById("quizSelectCard").style.display = "none";
+    quizSelectCard.style.display = "none"; // クイズ中は非表示
 
     let baseQuestions = [];
     const normalStatuses = selectedStatuses.filter(s => s !== "miss");
@@ -875,6 +835,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function showQuestion(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
+    quizSelectCard.style.display = "none"; // クイズ画面でも非表示を徹底
     
     if(index >= quiz.questions.length){ showResult(); return; }
 
@@ -930,7 +891,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     results.push({ question: q.question, user: user, answer: q.answer, correct });
     
-    // 内包型構造にログを保存
     originalQuiz.logs[q.originalIdx] = {
       correct: original.stats.correct,
       wrong: original.stats.wrong,
@@ -995,7 +955,9 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function showResult(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    document.getElementById("quizSelectCard").style.display = "block";
+    
+    // 【修正箇所】リザルト画面では問題選択UIを絶対に表示させない
+    quizSelectCard.style.display = "none"; 
 
     const total = results.length;
     if(total === 0) { showStart(); return; }
@@ -1028,7 +990,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
     `;
 
-    fetchQuizList(); // 終了時にリストの正答率表示などを自動更新
+    fetchQuizList(); // クラウドデータの表示更新処理
 
     const retryBtn = appArea.querySelector("#retryBtn");
     if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
@@ -1044,7 +1006,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     }
     quiz = { questions: [...misses] };
     index=0; score=0; results=[]; misses=[];
-    document.getElementById("quizSelectCard").style.display = "none";
+    quizSelectCard.style.display = "none";
     showQuestion();
   }
 
