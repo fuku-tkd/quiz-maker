@@ -79,7 +79,7 @@ label {
   color: var(--sub);
 }
 
-input[type="text"], textarea {
+input[type="text"], textarea, select {
   width: 100%;
   padding: 14px;
   border-radius: 12px;
@@ -91,7 +91,7 @@ input[type="text"], textarea {
   font-family: inherit;
 }
 
-input[type="text"]:focus, textarea:focus {
+input[type="text"]:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary);
 }
@@ -199,29 +199,28 @@ button:hover { opacity: 0.9; }
 
 <div class="container">
 
-<h1>問題集制作エディタ (Firebase版)</h1>
+<h1>問題集制作エディタ (クラウド管理版)</h1>
 
 <div class="card">
-  <h2>クラウドから問題集を読み込む</h2>
-  <label for="loadQuizId">読込用 問題集ID (半角英数字)</label>
-  <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-    <input type="text" id="loadQuizId" placeholder="例: geography01" style="margin-bottom:0;">
-    <button class="primary" id="cloudLoadBtn" style="white-space: nowrap;">☁️ 読み込む</button>
+  <h2>既存の問題集を編集する</h2>
+  <label for="quizSelect">クラウド上の問題集を選択</label>
+  <div style="display: flex; gap: 10px; margin-bottom: 4px;">
+    <select id="quizSelect" style="margin-bottom:0;">
+      <option value="">-- クラウドから読込中、または問題集がありません --</option>
+    </select>
+    <button class="primary" id="cloudLoadBtn" style="white-space: nowrap;">📂 読み込む</button>
   </div>
-  <div style="font-size: 13px; color: var(--sub);">※データベースに既に存在するIDを入力すると、その続きから編集できます。</div>
 </div>
 
 <div class="card">
-  <h2>問題集の設定・保存</h2>
+  <h2>問題集の設定・保存・削除</h2>
   
-  <label for="quizTitle">問題集の表示タイトル</label>
-  <input type="text" id="quizTitle" placeholder="例: 日本地理クイズ">
+  <label for="quizTitle">問題集のタイトル（選択メニューにこの名前が並びます）</label>
+  <input type="text" id="quizTitle" placeholder="例: 日本地理マスタークイズ">
 
-  <label for="saveQuizId">保存用 問題集ID (半角英数字・一度決めたら変更不可)</label>
-  <input type="text" id="saveQuizId" placeholder="例: geography01 (解答側でこのIDを入力して呼び出します)">
-  
   <div class="button-row">
-    <button class="success" id="cloudSaveBtn">☁️ クラウドに保存（新規・上書き）</button>
+    <button class="success" id="cloudSaveBtn">☁️ クラウドに保存（新規作成 / 上書き）</button>
+    <button class="danger" id="cloudDeleteBtn" style="display: none;">🗑️ クラウドからこの問題集を削除</button>
     <span id="statusMsg" class="status-msg"></span>
   </div>
 </div>
@@ -253,9 +252,8 @@ button:hover { opacity: 0.9; }
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-  // 取得したFirebaseのConfig情報
   const firebaseConfig = {
     apiKey: "AIzaSyCV2acb2e09L-2iedCJPJtEpsoN8i8L4v0",
     authDomain: "quiz-maker-6259f.firebaseapp.com",
@@ -266,19 +264,54 @@ button:hover { opacity: 0.9; }
     measurementId: "G-0Q8ZKMS07B"
   };
 
-  // Firebase初期化
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // グローバル変数
   let questions = [];
   let editIndex = null;
+  let currentLoadedDocId = null; 
 
-  // DOM要素のバインドとイベント登録
+  // イベント設定
   document.getElementById("mainBtn").onclick = handleMain;
   document.getElementById("cancelBtn").onclick = cancelEdit;
   document.getElementById("cloudSaveBtn").onclick = saveToFirebase;
   document.getElementById("cloudLoadBtn").onclick = loadFromFirebase;
+  document.getElementById("cloudDeleteBtn").onclick = deleteFromFirebase;
+
+  window.addEventListener("DOMContentLoaded", refreshQuizList);
+
+  async function refreshQuizList() {
+    const select = document.getElementById("quizSelect");
+    select.innerHTML = '<option value="">⏳ 読み込み中...</option>';
+    
+    try {
+      const querySnapshot = await getDocs(collection(db, "quizzes"));
+      select.innerHTML = '';
+      
+      if(querySnapshot.empty) {
+        select.innerHTML = '<option value="">クラウド上に問題集がありません</option>';
+        document.getElementById("cloudDeleteBtn").style.display = "none";
+        return;
+      }
+
+      const defaultOpt = document.createElement("option");
+      defaultOpt.value = "";
+      defaultOpt.textContent = "-- 編集する問題集を選択してください --";
+      select.appendChild(defaultOpt);
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const opt = document.createElement("option");
+        opt.value = doc.id; 
+        opt.textContent = data.title || "無題の問題集";
+        if(currentLoadedDocId === doc.id) opt.selected = true; 
+        select.appendChild(opt);
+      });
+    } catch(err) {
+      console.error(err);
+      select.innerHTML = '<option value="">❌ リストの一覧取得に失敗しました</option>';
+    }
+  }
 
   function handleMain(){
     if(editIndex===null){
@@ -310,7 +343,7 @@ button:hover { opacity: 0.9; }
     clearForm();
   }
 
-  window.editQuestion = function(i) { // HTML内のonclickから呼ぶためwindowにバインド
+  window.editQuestion = function(i) {
     editIndex=i;
     document.getElementById("formTitle").textContent = "⚙️ 問題の編集（変更中）";
     document.getElementById("questionInput").value = questions[i].question;
@@ -397,21 +430,14 @@ button:hover { opacity: 0.9; }
   }
 
   /* =========================================
-     Firebase (Firestore) 保存・読込ロジック
+     Firebase 保存・読込・削除ロジック
      ========================================= */
   async function saveToFirebase() {
     const title = document.getElementById("quizTitle").value.trim();
-    const quizId = document.getElementById("saveQuizId").value.trim();
     const msgEl = document.getElementById("statusMsg");
 
-    if(!title || !quizId) {
-      alert("「表示タイトル」と「保存用問題集ID」を両方入力してください");
-      return;
-    }
-
-    // IDの簡易バリデーション (半角英数字チェック)
-    if(!/^[a-zA-Z0-9_-]+$/.test(quizId)) {
-      alert("問題集IDは半角英数字、ハイフン、アンダースコアのみで入力してください");
+    if(!title) {
+      alert("問題集のタイトルを入力してください");
       return;
     }
 
@@ -419,44 +445,46 @@ button:hover { opacity: 0.9; }
     msgEl.style.color = "var(--sub)";
 
     try {
-      // Firestoreの 'quizzes' コレクションの 'quizId' ドキュメントに保存
-      await setDoc(doc(db, "quizzes", quizId), {
+      const docId = currentLoadedDocId || "quiz_" + Date.now();
+
+      await setDoc(doc(db, "quizzes", docId), {
         title: title,
         questions: questions
       });
 
+      currentLoadedDocId = docId;
       msgEl.textContent = "✅ クラウド保存完了！";
       msgEl.style.color = "var(--good)";
       
-      // 読み込み欄にも自動セット
-      document.getElementById("loadQuizId").value = quizId;
+      // 削除ボタンを表示させる
+      document.getElementById("cloudDeleteBtn").style.display = "inline-block";
+      await refreshQuizList();
     } catch (error) {
-      console.error("Error saving document: ", error);
-      msgEl.textContent = "❌ 保存失敗。権限などを確認してください。";
+      console.error(error);
+      msgEl.textContent = "❌ 保存失敗。";
       msgEl.style.color = "var(--bad)";
     }
   }
 
   async function loadFromFirebase() {
-    const quizId = document.getElementById("loadQuizId").value.trim();
-    if(!quizId) {
-      alert("読み込みたい問題集IDを入力してください");
+    const docId = document.getElementById("quizSelect").value;
+    if(!docId) {
+      alert("読み込みたい問題集をメニューから選択してください");
       return;
     }
 
     try {
-      const docRef = doc(db, "quizzes", quizId);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDoc(doc(db, "quizzes", docId));
 
       if (docSnap.exists()) {
         const data = docSnap.data();
         document.getElementById("quizTitle").value = data.title || "";
-        document.getElementById("saveQuizId").value = quizId;
-        // 編集ロック用にID変更不可にする場合はここを有効に
-        document.getElementById("saveQuizId").disabled = true;
+        currentLoadedDocId = docId; 
+
+        // 読み込みが成功したら削除ボタンを表示
+        document.getElementById("cloudDeleteBtn").style.display = "inline-block";
 
         questions = data.questions || [];
-        // 過去のstats保持の互換性チェック
         questions.forEach(q => {
           if(!q.unit) q.unit = q.status || "共通単元";
           if(!q.stats) q.stats = { correct: 0, wrong: 0 };
@@ -466,13 +494,47 @@ button:hover { opacity: 0.9; }
         editIndex = null;
         cancelEdit();
         render();
-        alert(`📂 問題集「${data.title}」をロードしました（全 ${questions.length} 問）`);
-      } else {
-        alert("⚠️ 指定されたIDの問題集は見つかりませんでした。");
+        document.getElementById("statusMsg").textContent = ""; // メッセージリセット
+        alert(`📂 「${data.title}」をロードしました（全 ${questions.length} 問）`);
       }
     } catch (error) {
-      console.error("Error loading document: ", error);
+      console.error(error);
       alert("❌ データの読み込みに失敗しました。");
+    }
+  }
+
+  async function deleteFromFirebase() {
+    if(!currentLoadedDocId) return;
+
+    const title = document.getElementById("quizTitle").value;
+    if(!confirm(`⚠️ 本当に問題集「${title}」をクラウドから完全に削除しますか？\nこの操作は取り消せません。`)) {
+      return;
+    }
+
+    const msgEl = document.getElementById("statusMsg");
+    msgEl.textContent = "⏳ 削除中...";
+    msgEl.style.color = "var(--sub)";
+
+    try {
+      // クラウドのドキュメントを削除
+      await deleteDoc(doc(db, "quizzes", currentLoadedDocId));
+
+      msgEl.textContent = "🗑️ 削除が完了しました";
+      msgEl.style.color = "var(--bad)";
+
+      // 各種入力をクリアして初期状態に戻す
+      currentLoadedDocId = null;
+      questions = [];
+      document.getElementById("quizTitle").value = "";
+      document.getElementById("cloudDeleteBtn").style.display = "none";
+      
+      cancelEdit();
+      render();
+      await refreshQuizList();
+    } catch(error) {
+      console.error(error);
+      alert("❌ クラウドからの削除に失敗しました。");
+      msgEl.textContent = "";
     }
   }
 
