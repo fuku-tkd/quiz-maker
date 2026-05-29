@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暗記学習ポータルハブ</title>
+
+<style>
+:root{
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --text:#1e293b;
+  --sub:#64748b;
+  --primary:#4f46e5;
+  --primary2:#4338ca;
+  --success:#22c55e;
+  --success2:#16a34a;
+  --border:#dbe4ff;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f172a;
+    --card:#111827;
+    --text:#f8fafc;
+    --sub:#94a3b8;
+    --border:#334155;
+  }
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  padding:20px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container{
+  width: 100%;
+  max-width:700px;
+  margin:auto;
+}
+
+h1{
+  text-align:center;
+  font-size:36px;
+  margin-bottom:12px;
+  font-weight: 800;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--sub);
+  font-size: 16px;
+  margin-bottom: 40px;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.menu-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 10px 28px rgba(0,0,0,.06);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.menu-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(99,102,241,0.15);
+}
+
+.icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.menu-title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.menu-desc {
+  font-size: 14px;
+  color: var(--sub);
+  line-height: 1.5;
+  margin-bottom: 24px;
+  flex-grow: 1;
+}
+
+.btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  border: none;
+}
+
+.btn-editor {
+  background: linear-gradient(135deg, var(--success), var(--success2));
+}
+
+.btn-quiz {
+  background: linear-gradient(135deg, var(--primary), var(--primary2));
+}
+
+@media(max-width:640px){
+  body { padding: 16px; align-items: flex-start; }
+  h1 { font-size: 28px; }
+  .menu-grid { grid-template-columns: 1fr; gap: 16px; }
+  .menu-card { padding: 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>暗記学習システム</h1>
+  <div class="subtitle">精度重視の学習＆問題集制作ポータル</div>
+
+  <div class="menu-grid">
+    
+    <a href="editor.html" class="menu-card">
+      <div>
+        <div class="icon">✍️</div>
+        <div class="menu-title">問題集を作る</div>
+        <div class="menu-desc">自作の問題文、正解、単元カテゴリを入力して、暗記システム専用のJSONファイルを作成・編集します。</div>
+      </div>
+      <button class="btn btn-editor">エディタを開く</button>
+    </a>
+
+    <a href="quiz.html" class="menu-card">
+      <div>
+        <div class="icon">🧠</div>
+        <div class="menu-title">問題を解く</div>
+        <div class="menu-desc">作成したJSONファイルを読み込み、単元ごとの正答率を確認しながら、苦手な問題を徹底的に潰します。</div>
+      </div>
+      <button class="btn btn-quiz">テストを始める</button>
+    </a>
+
+  </div>
+
+</div>
+
+</body>
+</html>
