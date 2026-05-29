@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>精度重視・暗記学習ツール (Firebase統合・お一人様内包ログ版)</title>
+<title>精度重視・暗記学習ツール (アコーディオンUI版)</title>
 
 <style>
 :root{
@@ -69,66 +69,126 @@ h2{
   position: relative;
 }
 
-/* --- 問題集選択のボタンタイルUI --- */
-.quiz-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
+/* --- 改良：1行ずつの問題集リストUI --- */
+.quiz-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 10px;
 }
 
-.quiz-tile-btn {
+.quiz-row-item {
   background: var(--card);
   border: 2px solid var(--border);
   border-radius: 18px;
-  padding: 20px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
   overflow: hidden;
+  transition: all 0.2s ease;
 }
 
-.quiz-tile-btn:hover {
+.quiz-row-item.active {
   border-color: var(--primary);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(99,102,241,0.12);
+  background: rgba(99,102,241,0.01);
 }
 
-.quiz-tile-btn.active {
-  border-color: var(--primary);
+.quiz-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.quiz-row-header:hover {
   background: rgba(99,102,241,0.04);
 }
 
-.quiz-tile-btn.active::after {
-  content: "✔ 選択中";
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: var(--primary);
-  color: white;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 999px;
+.quiz-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-grow: 1;
+  margin-right: 12px;
 }
 
-.quiz-tile-title {
+.quiz-row-title {
   font-size: 18px;
   font-weight: bold;
   color: var(--text);
-  line-height: 1.4;
   word-break: break-all;
-  margin-right: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.quiz-tile-count {
+.quiz-row-meta {
   font-size: 13px;
   color: var(--sub);
-  line-height: 1.5;
+}
+
+.quiz-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 選択バッジ */
+.select-status-badge {
+  background: var(--primary);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: none;
+}
+.quiz-row-item.active .select-status-badge {
+  display: inline-block;
+}
+
+/* トグル（^）ボタン */
+.toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--sub);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+.toggle-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* アコーディオン展開部分 */
+.quiz-row-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease-out;
+  background: rgba(0, 0, 0, 0.01);
+  border-top: 0px solid transparent;
+}
+.quiz-row-item.open .quiz-row-body {
+  max-height: 500px; /* 十分な高さ */
+  border-top: 1px dashed var(--border);
+}
+
+.accordion-inner {
+  padding: 16px 20px;
+}
+
+.accordion-unit-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--sub);
+  margin-bottom: 6px;
 }
 
 /* 振動アニメーション */
@@ -401,7 +461,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   h1{font-size:26px;}
   .question{font-size:36px;}
   .button-row>*{width:100%;}
-  .quiz-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -413,8 +472,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
 <div class="card" id="quizSelectCard">
   <h2>問題集を選択</h2>
-  <div class="quiz-grid" id="quizGrid">
-    <div style="grid-column: 1/-1; text-align: center; color: var(--sub); padding: 20px;">
+  <div class="quiz-list-container" id="quizGrid">
+    <div style="text-align: center; color: var(--sub); padding: 20px;">
       ⏳ クラウドから問題集をロード中...
     </div>
   </div>
@@ -483,14 +542,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     localStorage.setItem("userQuizTotalCount", totalCountGlobal);
   }
 
-  // クラウドから問題集一覧を取得してタイル型の選択ボタンとして配置（内包型logsから進捗も算出表示）
+  // クラウドから問題集一覧を取得して1行ずつのアコーディオンUIとして配置
   async function fetchQuizList() {
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
       quizGrid.innerHTML = "";
 
       if(querySnapshot.empty) {
-        quizGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--sub); padding: 20px;">クラウドに問題集が登録されていません。エディタから作成してください。</div>';
+        quizGrid.innerHTML = '<div style="text-align: center; color: var(--sub); padding: 20px;">クラウドに問題集が登録されていません。エディタから作成してください。</div>';
         return;
       }
 
@@ -505,59 +564,123 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         let totalCount = 0;
         let attemptedCount = 0;
 
+        // 単元ごとの集計用
+        const unitStats = {};
+
         questions.forEach((q, idx) => {
+          const unitName = q.unit || q.status || "共通単元";
+          if(!unitStats[unitName]) unitStats[unitName] = { correct: 0, total: 0 };
+
           const log = logs[idx];
           if(log) {
             const c = log.correct || 0;
             const w = log.wrong || 0;
-            if((c + w) > 0) attemptedCount++;
-            totalCorrect += c;
-            totalCount += (c + w);
+            if((c + w) > 0) {
+              attemptedCount++;
+              unitStats[unitName].correct += c;
+              unitStats[unitName].total += (c + w);
+              totalCorrect += c;
+              totalCount += (c + w);
+            }
           }
         });
 
         const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
-        const metaText = totalCount > 0 
-          ? `<br><span style="font-size:12px; color:var(--sub);">進捗: ${attemptedCount}/${qCount}問 (正答率: ${accuracy}%)</span>` 
-          : `<br><span style="font-size:12px; color:var(--sub);">未挑戦</span>`;
 
-        // ボタン型カードエレメントの作成
-        const btn = document.createElement("button");
-        btn.className = "quiz-tile-btn";
-        btn.id = `tile_${doc.id}`;
-        btn.innerHTML = `
-          <div class="quiz-tile-title">${escapeHtml(title)}</div>
-          <div class="quiz-tile-count">収録問題数: ${qCount}問 ${metaText}</div>
+        // アコーディオン内部の単元別進捗HTMLを生成
+        let accordionUnitsHTML = "";
+        Object.keys(unitStats).forEach(uName => {
+          const us = unitStats[uName];
+          const uRate = us.total === 0 ? 0 : Math.round((us.correct / us.total) * 100);
+          if(us.total > 0) {
+            accordionUnitsHTML += `
+              <div style="margin-bottom: 10px;">
+                <div class="accordion-unit-title">■ ${escapeHtml(uName)} (正答率: ${uRate}%)</div>
+                <div class="bar-container"><div class="bar" style="width:${uRate}%"></div></div>
+              </div>
+            `;
+          }
+        });
+        if(!accordionUnitsHTML) {
+          accordionUnitsHTML = '<div style="font-size:12px; color:var(--sub);">解答データがまだありません。</div>';
+        }
+
+        // 1行アイテムコンテナの作成
+        const rowItem = document.createElement("div");
+        rowItem.className = "quiz-row-item";
+        rowItem.id = `row_${doc.id}`;
+        if (quizDocId === doc.id) rowItem.classList.add("active");
+
+        rowItem.innerHTML = `
+          <div class="quiz-row-header" id="header_${doc.id}">
+            <div class="quiz-row-left">
+              <div class="quiz-row-title">
+                <span>${escapeHtml(title)}</span>
+                <span class="select-status-badge">選択中</span>
+              </div>
+              <div class="quiz-row-meta">
+                収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
+              </div>
+            </div>
+            <div class="quiz-action-btns">
+              <button class="toggle-btn" id="toggle_btn_${doc.id}" title="詳細進捗を開閉">^</button>
+            </div>
+          </div>
+          <div class="quiz-row-body" id="body_${doc.id}">
+            <div class="accordion-inner">
+              <div style="font-size: 14px; font-weight:bold; margin-bottom:8px; color:var(--text);">単元別データ進捗:</div>
+              ${accordionUnitsHTML}
+            </div>
+          </div>
         `;
         
-        btn.onclick = () => selectQuiz(doc.id);
-        quizGrid.appendChild(btn);
+        // ヘッダー（全体）をクリックしたら問題集を選択
+        rowItem.querySelector(`.quiz-row-left`).onclick = (e) => {
+          selectQuiz(doc.id);
+        };
+
+        // ^ ボタンを押した時だけアコーディオンを開閉する
+        const toggleBtn = rowItem.querySelector(`#toggle_btn_${doc.id}`);
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation(); // 親要素の選択イベントを発火させない
+          const isOpen = rowItem.classList.contains("open");
+          if(isOpen) {
+            rowItem.classList.remove("open");
+            toggleBtn.textContent = "^";
+          } else {
+            rowItem.classList.add("open");
+            toggleBtn.textContent = "∨";
+          }
+        };
+
+        quizGrid.appendChild(rowItem);
       });
     } catch(err) {
       console.error(err);
-      quizGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--bad); padding: 20px;">❌ 問題集の一覧取得に失敗しました</div>';
+      quizGrid.innerHTML = '<div style="text-align: center; color: var(--bad); padding: 20px;">❌ 問題集の一覧取得に失敗しました</div>';
     }
   }
 
-  // ボタン型カードを押した時の処理
+  // 問題集を選択した時の処理
   async function selectQuiz(id) {
     quizDocId = id;
 
-    // タイルのアクティブスタイルを切り替え
-    document.querySelectorAll(".quiz-tile-btn").forEach(el => el.classList.remove("active"));
-    const activeTile = document.getElementById(`tile_${id}`);
-    if(activeTile) activeTile.classList.add("active");
+    // リストのアクティブスタイルを切り替え
+    document.querySelectorAll(".quiz-row-item").forEach(el => el.classList.remove("active"));
+    const activeRow = document.getElementById(`row_${id}`);
+    if(activeRow) activeRow.classList.add("active");
 
-    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドから「${activeTile.querySelector('.quiz-tile-title').textContent}」を読み込んでいます...</div>`;
+    const titleText = activeRow.querySelector('.quiz-row-title span').textContent;
+    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドから「${titleText}」を読み込んでいます...</div>`;
 
     try {
       const docSnap = await getDoc(doc(db, "quizzes", quizDocId));
       if(docSnap.exists()) {
         originalQuiz = docSnap.data();
         if(!originalQuiz.questions) originalQuiz.questions = [];
-        if(!originalQuiz.logs) originalQuiz.logs = {}; // なければ初期化
+        if(!originalQuiz.logs) originalQuiz.logs = {}; 
         
-        // 💡 同一ドキュメント内の内包型 logs から問題のステータスを復元する（機能喪失を防ぐコア処理）
+        // 内包型 logs から各問題のリアルタイムステータスを復元
         originalQuiz.questions.forEach((q, idx) => {
           const log = originalQuiz.logs[idx] || { correct: 0, wrong: 0, history: [] };
           q.stats = { correct: log.correct || 0, wrong: log.wrong || 0 };
@@ -807,7 +930,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     results.push({ question: q.question, user: user, answer: q.answer, correct });
     
-    // 💡 既存の履歴・集計ロジックを崩さず、そのまま問題集内部の `logs` オブジェクトへマッピング
+    // 内包型構造にログを保存
     originalQuiz.logs[q.originalIdx] = {
       correct: original.stats.correct,
       wrong: original.stats.wrong,
@@ -816,7 +939,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     };
 
     try {
-      // 1つのドキュメントにまとめて上書き保存
       await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
     } catch(e) {
       console.error("Firebaseへの同期に失敗しました", e);
@@ -906,7 +1028,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
     `;
 
-    fetchQuizList(); // 💡 テスト終了時にトップの問題集タイルの進捗・正答率表示をリフレッシュ
+    fetchQuizList(); // 終了時にリストの正答率表示などを自動更新
 
     const retryBtn = appArea.querySelector("#retryBtn");
     if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
