@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>精度重視・暗記学習ツール (Firebase統合・UI改良版)</title>
+<title>精度重視・暗記学習ツール (Firebase統合・お一人様内包ログ版)</title>
 
 <style>
 :root{
@@ -69,7 +69,7 @@ h2{
   position: relative;
 }
 
-/* --- 新設：問題集選択のボタンタイルUI --- */
+/* --- 問題集選択のボタンタイルUI --- */
 .quiz-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -122,12 +122,13 @@ h2{
   color: var(--text);
   line-height: 1.4;
   word-break: break-all;
-  margin-right: 40px; /* バッジと被らないように記述 */
+  margin-right: 40px;
 }
 
 .quiz-tile-count {
   font-size: 13px;
   color: var(--sub);
+  line-height: 1.5;
 }
 
 /* 振動アニメーション */
@@ -482,7 +483,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     localStorage.setItem("userQuizTotalCount", totalCountGlobal);
   }
 
-  // クラウドから問題集一覧を取得してタイル型の選択ボタンとして配置
+  // クラウドから問題集一覧を取得してタイル型の選択ボタンとして配置（内包型logsから進捗も算出表示）
   async function fetchQuizList() {
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
@@ -495,19 +496,40 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        const qCount = data.questions ? data.questions.length : 0;
+        const questions = data.questions || [];
+        const logs = data.logs || {}; 
+        const qCount = questions.length;
         const title = data.title || "無題の問題集";
         
+        let totalCorrect = 0;
+        let totalCount = 0;
+        let attemptedCount = 0;
+
+        questions.forEach((q, idx) => {
+          const log = logs[idx];
+          if(log) {
+            const c = log.correct || 0;
+            const w = log.wrong || 0;
+            if((c + w) > 0) attemptedCount++;
+            totalCorrect += c;
+            totalCount += (c + w);
+          }
+        });
+
+        const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
+        const metaText = totalCount > 0 
+          ? `<br><span style="font-size:12px; color:var(--sub);">進捗: ${attemptedCount}/${qCount}問 (正答率: ${accuracy}%)</span>` 
+          : `<br><span style="font-size:12px; color:var(--sub);">未挑戦</span>`;
+
         // ボタン型カードエレメントの作成
         const btn = document.createElement("button");
         btn.className = "quiz-tile-btn";
         btn.id = `tile_${doc.id}`;
         btn.innerHTML = `
           <div class="quiz-tile-title">${escapeHtml(title)}</div>
-          <div class="quiz-tile-count">収録問題数: ${qCount}問</div>
+          <div class="quiz-tile-count">収録問題数: ${qCount}問 ${metaText}</div>
         `;
         
-        // クリックしたときの選択処理
         btn.onclick = () => selectQuiz(doc.id);
         quizGrid.appendChild(btn);
       });
@@ -517,7 +539,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     }
   }
 
-  // ボタンを押した時の処理
+  // ボタン型カードを押した時の処理
   async function selectQuiz(id) {
     quizDocId = id;
 
@@ -533,13 +555,17 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       if(docSnap.exists()) {
         originalQuiz = docSnap.data();
         if(!originalQuiz.questions) originalQuiz.questions = [];
-        originalQuiz.questions.forEach(q => {
-          if (!q.stats) q.stats = { correct: 0, wrong: 0 };
-          if (!q.statsHistory) q.statsHistory = [];
+        if(!originalQuiz.logs) originalQuiz.logs = {}; // なければ初期化
+        
+        // 💡 同一ドキュメント内の内包型 logs から問題のステータスを復元する（機能喪失を防ぐコア処理）
+        originalQuiz.questions.forEach((q, idx) => {
+          const log = originalQuiz.logs[idx] || { correct: 0, wrong: 0, history: [] };
+          q.stats = { correct: log.correct || 0, wrong: log.wrong || 0 };
+          q.statsHistory = log.history || [];
           if (!q.unit) q.unit = q.status || "共通単元";
         });
+
         showStart();
-        // 設定画面へスムーズにスクロール
         appArea.scrollIntoView({ behavior: 'smooth' });
       }
     } catch(err) {
@@ -781,7 +807,16 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     results.push({ question: q.question, user: user, answer: q.answer, correct });
     
+    // 💡 既存の履歴・集計ロジックを崩さず、そのまま問題集内部の `logs` オブジェクトへマッピング
+    originalQuiz.logs[q.originalIdx] = {
+      correct: original.stats.correct,
+      wrong: original.stats.wrong,
+      history: original.statsHistory,
+      last: new Date().toISOString()
+    };
+
     try {
+      // 1つのドキュメントにまとめて上書き保存
       await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
     } catch(e) {
       console.error("Firebaseへの同期に失敗しました", e);
@@ -870,6 +905,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         ${detail}
       </div>
     `;
+
+    fetchQuizList(); // 💡 テスト終了時にトップの問題集タイルの進捗・正答率表示をリフレッシュ
 
     const retryBtn = appArea.querySelector("#retryBtn");
     if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
