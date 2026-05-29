@@ -96,22 +96,6 @@ input[type="text"]:focus, textarea:focus {
   border-color: var(--primary);
 }
 
-/* ファイルエリア */
-.file-area {
-  display: block;
-  width: 100%;
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  cursor: pointer;
-  border: 2px dashed var(--primary);
-  background: rgba(99,102,241,0.03);
-  font-weight: bold;
-  font-size: 16px;
-  margin-bottom: 16px;
-}
-input[type="file"] { display: none; }
-
 button{
   border:none;
   border-radius:12px;
@@ -197,6 +181,12 @@ button:hover { opacity: 0.9; }
   border-radius: 8px;
 }
 
+.status-msg {
+  font-weight: bold;
+  margin-left: 10px;
+  align-self: center;
+}
+
 @media(max-width:640px){
   body{ padding: 10px; }
   .card{ padding: 16px; }
@@ -209,39 +199,48 @@ button:hover { opacity: 0.9; }
 
 <div class="container">
 
-<h1>問題集制作エディタ</h1>
+<h1>問題集制作エディタ (Firebase版)</h1>
 
 <div class="card">
-  <h2>ファイル管理・基本設定</h2>
-  
-  <label class="file-area" for="fileInput">
-    📂 既存のJSONファイルを読み込んで再編集
-  </label>
-  <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
+  <h2>クラウドから問題集を読み込む</h2>
+  <label for="loadQuizId">読込用 問題集ID (半角英数字)</label>
+  <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+    <input type="text" id="loadQuizId" placeholder="例: geography01" style="margin-bottom:0;">
+    <button class="primary" id="cloudLoadBtn" style="white-space: nowrap;">☁️ 読み込む</button>
+  </div>
+  <div style="font-size: 13px; color: var(--sub);">※データベースに既に存在するIDを入力すると、その続きから編集できます。</div>
+</div>
 
-  <label for="quizTitle">問題集のタイトル</label>
-  <input type="text" id="quizTitle" placeholder="例: 国家試験対策・重要英単語">
+<div class="card">
+  <h2>問題集の設定・保存</h2>
+  
+  <label for="quizTitle">問題集の表示タイトル</label>
+  <input type="text" id="quizTitle" placeholder="例: 日本地理クイズ">
+
+  <label for="saveQuizId">保存用 問題集ID (半角英数字・一度決めたら変更不可)</label>
+  <input type="text" id="saveQuizId" placeholder="例: geography01 (解答側でこのIDを入力して呼び出します)">
   
   <div class="button-row">
-    <button class="success" onclick="saveFile()">💾 JSONファイルとして保存・ダウンロード</button>
+    <button class="success" id="cloudSaveBtn">☁️ クラウドに保存（新規・上書き）</button>
+    <span id="statusMsg" class="status-msg"></span>
   </div>
 </div>
 
 <div class="card">
   <h2 id="formTitle">問題の新規作成</h2>
   
-  <label for="unitInput">単元名・カテゴリ（暗記システムで自動分類されます）</label>
-  <input type="text" id="unitInput" placeholder="例: 第1章 基礎知識 / 果物シリーズ / 日本史・江戸時代">
+  <label for="unitInput">単元名・カテゴリ</label>
+  <input type="text" id="unitInput" placeholder="例: 第1章 基礎知識 / 日本史・江戸時代">
 
   <label for="questionInput">問題文</label>
-  <textarea id="questionInput" rows="3" placeholder="ここに問題にする文章を入力してください"></textarea>
+  <textarea id="questionInput" rows="3" placeholder="ここに問題文を入力してください"></textarea>
   
-  <label for="answerInput">正解の単語（解答ページで完全一致判定される文字列）</label>
+  <label for="answerInput">正解の単語</label>
   <input type="text" id="answerInput" placeholder="ここに答えを入力してください">
 
   <div class="button-row">
-    <button id="mainBtn" class="primary" onclick="handleMain()">問題を追加</button>
-    <button id="cancelBtn" class="gray" style="display:none;" onclick="cancelEdit()">キャンセル</button>
+    <button id="mainBtn" class="primary">問題を追加</button>
+    <button id="cancelBtn" class="gray" style="display:none;">キャンセル</button>
   </div>
 </div>
 
@@ -252,195 +251,235 @@ button:hover { opacity: 0.9; }
 
 </div>
 
-<script>
-let questions=[];
-let editIndex=null;
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-function handleMain(){
-  if(editIndex===null){
-    addQuestion();
-  }else{
-    updateQuestion();
-  }
-}
+  // 取得したFirebaseのConfig情報
+  const firebaseConfig = {
+    apiKey: "AIzaSyCV2acb2e09L-2iedCJPJtEpsoN8i8L4v0",
+    authDomain: "quiz-maker-6259f.firebaseapp.com",
+    projectId: "quiz-maker-6259f",
+    storageBucket: "quiz-maker-6259f.firebasestorage.app",
+    messagingSenderId: "671224317335",
+    appId: "1:671224317335:web:24baa4a56291ea19a630d2",
+    measurementId: "G-0Q8ZKMS07B"
+  };
 
-function addQuestion(){
-  const q = document.getElementById("questionInput").value.trim();
-  const a = document.getElementById("answerInput").value.trim();
-  const u = document.getElementById("unitInput").value.trim() || "共通単元";
-  
-  if(!q || !a){ 
-    alert("問題文と正解は必ず入力してください"); 
-    return; 
-  }
+  // Firebase初期化
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-  // 暗記ページのオブジェクト構造（stats等の初期値）を担保してプッシュ
-  questions.push({
-    question: q,
-    answer: a,
-    unit: u,
-    stats: { correct: 0, wrong: 0 },
-    statsHistory: []
-  });
-  
-  render();
-  clearForm();
-}
+  // グローバル変数
+  let questions = [];
+  let editIndex = null;
 
-function editQuestion(i){
-  editIndex=i;
-  document.getElementById("formTitle").textContent = "⚙️ 問題の編集（変更中）";
-  document.getElementById("questionInput").value = questions[i].question;
-  document.getElementById("answerInput").value = questions[i].answer;
-  document.getElementById("unitInput").value = questions[i].unit || "";
-  
-  document.getElementById("mainBtn").textContent = "変更を確定する";
-  document.getElementById("cancelBtn").style.display = "inline-block";
-  render();
-  document.getElementById("formTitle").scrollIntoView({ behavior: 'smooth' });
-}
+  // DOM要素のバインドとイベント登録
+  document.getElementById("mainBtn").onclick = handleMain;
+  document.getElementById("cancelBtn").onclick = cancelEdit;
+  document.getElementById("cloudSaveBtn").onclick = saveToFirebase;
+  document.getElementById("cloudLoadBtn").onclick = loadFromFirebase;
 
-function updateQuestion(){
-  const q = document.getElementById("questionInput").value.trim();
-  const a = document.getElementById("answerInput").value.trim();
-  const u = document.getElementById("unitInput").value.trim() || "共通単元";
-  
-  if(!q || !a){ 
-    alert("問題文と正解は必ず入力してください"); 
-    return; 
-  }
-
-  // 既存データ（過去の正答数など）を引き継ぎつつ上書き
-  questions[editIndex].question = q;
-  questions[editIndex].answer = a;
-  questions[editIndex].unit = u;
-
-  editIndex=null;
-  document.getElementById("formTitle").textContent = "問題の新規作成";
-  document.getElementById("mainBtn").textContent = "問題を追加";
-  document.getElementById("cancelBtn").style.display = "none";
-  render();
-  clearForm();
-}
-
-function cancelEdit(){
-  editIndex=null;
-  document.getElementById("formTitle").textContent = "問題の新規作成";
-  document.getElementById("mainBtn").textContent = "問題を追加";
-  document.getElementById("cancelBtn").style.display = "none";
-  clearForm();
-  render();
-}
-
-function deleteQuestion(i){
-  if(confirm("この問題を削除してもよろしいですか？")){
-    questions.splice(i,1);
-    if(editIndex === i) {
-      cancelEdit();
-    } else if(editIndex > i) {
-      editIndex--;
+  function handleMain(){
+    if(editIndex===null){
+      addQuestion();
+    }else{
+      updateQuestion();
     }
+  }
+
+  function addQuestion(){
+    const q = document.getElementById("questionInput").value.trim();
+    const a = document.getElementById("answerInput").value.trim();
+    const u = document.getElementById("unitInput").value.trim() || "共通単元";
+    
+    if(!q || !a){ 
+      alert("問題文と正解は必ず入力してください"); 
+      return; 
+    }
+
+    questions.push({
+      question: q,
+      answer: a,
+      unit: u,
+      stats: { correct: 0, wrong: 0 },
+      statsHistory: []
+    });
+    
+    render();
+    clearForm();
+  }
+
+  window.editQuestion = function(i) { // HTML内のonclickから呼ぶためwindowにバインド
+    editIndex=i;
+    document.getElementById("formTitle").textContent = "⚙️ 問題の編集（変更中）";
+    document.getElementById("questionInput").value = questions[i].question;
+    document.getElementById("answerInput").value = questions[i].answer;
+    document.getElementById("unitInput").value = questions[i].unit || "";
+    
+    document.getElementById("mainBtn").textContent = "変更を確定する";
+    document.getElementById("cancelBtn").style.display = "inline-block";
+    render();
+    document.getElementById("formTitle").scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function updateQuestion(){
+    const q = document.getElementById("questionInput").value.trim();
+    const a = document.getElementById("answerInput").value.trim();
+    const u = document.getElementById("unitInput").value.trim() || "共通単元";
+    
+    if(!q || !a){ 
+      alert("問題文と正解は必ず入力してください"); 
+      return; 
+    }
+
+    questions[editIndex].question = q;
+    questions[editIndex].answer = a;
+    questions[editIndex].unit = u;
+
+    editIndex=null;
+    document.getElementById("formTitle").textContent = "問題の新規作成";
+    document.getElementById("mainBtn").textContent = "問題を追加";
+    document.getElementById("cancelBtn").style.display = "none";
+    render();
+    clearForm();
+  }
+
+  function cancelEdit(){
+    editIndex=null;
+    document.getElementById("formTitle").textContent = "問題の新規作成";
+    document.getElementById("mainBtn").textContent = "問題を追加";
+    document.getElementById("cancelBtn").style.display = "none";
+    clearForm();
     render();
   }
-}
 
-function render(){
-  const list = document.getElementById("list");
-  list.innerHTML="";
-  document.getElementById("qCount").textContent = questions.length;
-
-  if(questions.length === 0) {
-    list.innerHTML = `<div style="text-align:center; color:var(--sub); padding:20px;">問題がありません。上のフォームから追加してください。</div>`;
-    return;
+  window.deleteQuestion = function(i) {
+    if(confirm("この問題を削除してもよろしいですか？")){
+      questions.splice(i,1);
+      if(editIndex === i) cancelEdit();
+      else if(editIndex > i) editIndex--;
+      render();
+    }
   }
 
-  questions.forEach((q,i)=>{
-    const div=document.createElement("div");
-    div.className="question-item";
-    if(i===editIndex) div.classList.add("editing");
+  function render(){
+    const list = document.getElementById("list");
+    list.innerHTML="";
+    document.getElementById("qCount").textContent = questions.length;
 
-    div.innerHTML=`
-      <div class="q-meta">#${i+1} 【単元: ${q.unit || '共通単元'}】</div>
-      <div class="q-text">${escapeHtml(q.question)}</div>
-      <div class="q-ans">正解: ${escapeHtml(q.answer)}</div>
-      <div class="item-actions">
-        <button class="primary" onclick="editQuestion(${i})">編集</button>
-        <button class="danger" onclick="deleteQuestion(${i})">削除</button>
-      </div>
-    `;
-    list.appendChild(div);
-  });
-}
+    if(questions.length === 0) {
+      list.innerHTML = `<div style="text-align:center; color:var(--sub); padding:20px;">問題がありません。上のフォームから追加してください。</div>`;
+      return;
+    }
 
-function clearForm(){
-  document.getElementById("questionInput").value="";
-  document.getElementById("answerInput").value="";
-  // 単元名は連続して作りやすいように、あえてクリアせず残します
-}
+    questions.forEach((q,i)=>{
+      const div=document.createElement("div");
+      div.className="question-item";
+      if(i===editIndex) div.classList.add("editing");
 
-function saveFile(){
-  const title = document.getElementById("quizTitle").value.trim();
-  if(!title){ 
-    alert("問題集のタイトルを入力してください"); 
-    return; 
+      div.innerHTML=`
+        <div class="q-meta">#${i+1} 【単元: ${q.unit || '共通単元'}】</div>
+        <div class="q-text">${escapeHtml(q.question)}</div>
+        <div class="q-ans">正解: ${escapeHtml(q.answer)}</div>
+        <div class="item-actions">
+          <button class="primary" onclick="editQuestion(${i})">編集</button>
+          <button class="danger" onclick="deleteQuestion(${i})">削除</button>
+        </div>
+      `;
+      list.appendChild(div);
+    });
   }
 
-  const data={
-    title: title,
-    questions: questions
-  };
+  function clearForm(){
+    document.getElementById("questionInput").value="";
+    document.getElementById("answerInput").value="";
+  }
 
-  const blob=new Blob(
-    [JSON.stringify(data, null, 2)],
-    {type:"application/json"}
-  );
+  /* =========================================
+     Firebase (Firestore) 保存・読込ロジック
+     ========================================= */
+  async function saveToFirebase() {
+    const title = document.getElementById("quizTitle").value.trim();
+    const quizId = document.getElementById("saveQuizId").value.trim();
+    const msgEl = document.getElementById("statusMsg");
 
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download = `${title}.json`;
-  a.click();
-}
+    if(!title || !quizId) {
+      alert("「表示タイトル」と「保存用問題集ID」を両方入力してください");
+      return;
+    }
 
-function loadFile(e){
-  const file=e.target.files[0];
-  if(!file) return;
+    // IDの簡易バリデーション (半角英数字チェック)
+    if(!/^[a-zA-Z0-9_-]+$/.test(quizId)) {
+      alert("問題集IDは半角英数字、ハイフン、アンダースコアのみで入力してください");
+      return;
+    }
 
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    try{
-      const data=JSON.parse(ev.target.result);
+    msgEl.textContent = "⏳ 保存中...";
+    msgEl.style.color = "var(--sub)";
 
-      document.getElementById("quizTitle").value = data.title || "";
-      // もし読み込んだデータに単元（unit）がなく旧型（status等）だった場合の互換処理
-      questions = data.questions || [];
-      questions.forEach(q => {
-        if(!q.unit) q.unit = q.status || "共通単元";
-        if(!q.stats) q.stats = { correct: 0, wrong: 0 };
-        if(!q.statsHistory) q.statsHistory = [];
+    try {
+      // Firestoreの 'quizzes' コレクションの 'quizId' ドキュメントに保存
+      await setDoc(doc(db, "quizzes", quizId), {
+        title: title,
+        questions: questions
       });
 
-      editIndex=null;
-      document.getElementById("formTitle").textContent = "問題の新規作成";
-      document.getElementById("cancelBtn").style.display="none";
-      document.getElementById("mainBtn").textContent="問題を追加";
-      render();
-
-    }catch{
-      alert("ファイルの解析に失敗しました。正しい暗記用JSONファイルか確認してください。");
+      msgEl.textContent = "✅ クラウド保存完了！";
+      msgEl.style.color = "var(--good)";
+      
+      // 読み込み欄にも自動セット
+      document.getElementById("loadQuizId").value = quizId;
+    } catch (error) {
+      console.error("Error saving document: ", error);
+      msgEl.textContent = "❌ 保存失敗。権限などを確認してください。";
+      msgEl.style.color = "var(--bad)";
     }
-  };
-  reader.readAsText(file);
-  e.target.value = ""; // 同じファイルを再度読み込めるようにリセット
-}
+  }
 
-function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-}
+  async function loadFromFirebase() {
+    const quizId = document.getElementById("loadQuizId").value.trim();
+    if(!quizId) {
+      alert("読み込みたい問題集IDを入力してください");
+      return;
+    }
+
+    try {
+      const docRef = doc(db, "quizzes", quizId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        document.getElementById("quizTitle").value = data.title || "";
+        document.getElementById("saveQuizId").value = quizId;
+        // 編集ロック用にID変更不可にする場合はここを有効に
+        document.getElementById("saveQuizId").disabled = true;
+
+        questions = data.questions || [];
+        // 過去のstats保持の互換性チェック
+        questions.forEach(q => {
+          if(!q.unit) q.unit = q.status || "共通単元";
+          if(!q.stats) q.stats = { correct: 0, wrong: 0 };
+          if(!q.statsHistory) q.statsHistory = [];
+        });
+
+        editIndex = null;
+        cancelEdit();
+        render();
+        alert(`📂 問題集「${data.title}」をロードしました（全 ${questions.length} 問）`);
+      } else {
+        alert("⚠️ 指定されたIDの問題集は見つかりませんでした。");
+      }
+    } catch (error) {
+      console.error("Error loading document: ", error);
+      alert("❌ データの読み込みに失敗しました。");
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
 </script>
 
 </body>
