@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>精度重視・暗記学習ツール</title>
+<title>精度重視・暗記学習ツール (Firebase統合版)</title>
 
 <style>
 :root{
@@ -52,6 +52,13 @@ h1{
   margin-bottom:24px;
 }
 
+h2{
+  font-size:18px;
+  margin:0 0 16px 0;
+  color:var(--sub);
+  font-weight:bold;
+}
+
 .card{
   background:var(--card);
   border:1px solid var(--border);
@@ -62,6 +69,7 @@ h1{
   position: relative;
 }
 
+/* 振動アニメーション */
 .shake {
   animation: shakeAnim 0.4s ease-in-out;
 }
@@ -69,6 +77,21 @@ h1{
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-8px); }
   40%, 80% { transform: translateX(8px); }
+}
+
+select, input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  font-size: 20px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+}
+select { font-size: 16px; }
+select:focus, input[type="text"]:focus, input[type="number"]:focus {
+  border-color: var(--primary);
 }
 
 .select-grid{
@@ -86,6 +109,7 @@ h1{
   color:#1e293b;
   font-size:16px;
   transition:.2s;
+  font-weight: bold;
 }
 
 .select-btn.active{
@@ -93,7 +117,7 @@ h1{
   color:white;
 }
 
-/* 統合された単元リストのスタイル */
+/* 単元リスト */
 .unit-list {
   display: flex;
   flex-direction: column;
@@ -118,7 +142,6 @@ h1{
   background: rgba(99,102,241,0.06);
 }
 
-/* チェックが外れているときは全体を半透明に */
 .unit-row-label.disabled {
   opacity: 0.4;
 }
@@ -164,38 +187,13 @@ h1{
   transition: width 0.3s ease;
 }
 
-input[type="text"], input[type="number"] {
-  width: 100%;
-  padding: 16px;
-  border-radius: 16px;
-  border: 2px solid var(--border);
-  font-size: 24px;
-  background: var(--card);
-  color: var(--text);
-}
-
-/* ファイルエリア */
-.file-area {
-  display: block;
-  width: 100%;
-  border-radius: 16px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  border: 2px dashed var(--primary);
-  background: rgba(99,102,241,0.03);
-  font-weight: bold;
-  font-size: 18px;
-}
-.file-name { margin-top: 8px; font-size: 14px; color: var(--sub); font-weight: normal; }
-input[type="file"] { display: none; }
-
-.main-btn,.sub-btn,.danger-sub-btn{
+.main-btn, .sub-btn, .danger-sub-btn{
   border:none;
   border-radius:16px;
   padding:14px 20px;
   font-size:18px;
   cursor:pointer;
+  font-weight: bold;
   transition: opacity 0.2s;
 }
 
@@ -227,6 +225,7 @@ input[type="file"] { display: none; }
   justify-content:center;
 }
 
+/* クイズ画面用 */
 .question{
   text-align:center;
   font-size:52px;
@@ -261,6 +260,7 @@ input[type="file"] { display: none; }
 .progress-inner{
   height:100%;
   background:linear-gradient(90deg,#22c55e,#16a34a);
+  transition: width 0.2s;
 }
 
 .stats{
@@ -282,33 +282,7 @@ input[type="file"] { display: none; }
   margin-top:8px;
 }
 
-/* ポップアップモーダル */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000; opacity: 0; pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-.modal-overlay.active { opacity: 1; pointer-events: auto; }
-.modal-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 24px; padding: 28px;
-  width: 90%; max-width: 440px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-  transform: scale(0.9); transition: transform 0.2s ease;
-  text-align: center;
-}
-.modal-overlay.active .modal-card { transform: scale(1); }
-.modal-header { font-size: 22px; font-weight: bold; margin-bottom: 14px; }
-.modal-body { font-size: 16px; color: var(--text); line-height: 1.6; margin-bottom: 22px; }
-
-.good{color:var(--good);}
-.bad{color:var(--bad);}
-
+/* ⭕❌ポップアップエフェクト */
 .effect-overlay {
   position: absolute;
   top: 50%; left: 50%;
@@ -335,6 +309,33 @@ input[type="file"] { display: none; }
   border-radius:18px; padding:14px; margin-bottom:12px;
 }
 
+/* システム通知用モーダル */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px; padding: 28px;
+  width: 90%; max-width: 440px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  transform: scale(0.9); transition: transform 0.2s ease;
+  text-align: center;
+}
+.modal-overlay.active .modal-card { transform: scale(1); }
+.modal-header { font-size: 22px; font-weight: bold; margin-bottom: 14px; }
+.modal-body { font-size: 16px; color: var(--text); line-height: 1.6; margin-bottom: 22px; }
+
+.good{color:var(--good);}
+.bad{color:var(--bad);}
+
 @media(max-width:640px){
   h1{font-size:26px;}
   .question{font-size:36px;}
@@ -348,480 +349,509 @@ input[type="file"] { display: none; }
 
 <h1>暗記学習システム</h1>
 
-<div class="card" id="fileControlCard">
-  <label class="file-area" for="fileInput">
-    📂 問題ファイルを読み込む（JSON）
-    <div class="file-name" id="fileName">問題ファイルを選択してください</div>
-  </label>
-  <input type="file" id="fileInput" accept=".json">
-
-  <div class="button-row" style="margin-top: 14px;">
-    <button class="sub-btn" id="exportBtn" onclick="exportProgress()">現在の進捗をJSON保存</button>
-    <label class="sub-btn" for="progressInput" style="text-align:center; cursor:pointer; padding:14px 20px; line-height:1.2;">過去の進捗ファイルをロード</label>
-    <input type="file" id="progressInput" accept=".json">
-  </div>
+<div class="card" id="quizSelectCard">
+  <h2>問題集を選択</h2>
+  <select id="quizSelect">
+    <option value="">⏳ クラウドから問題集をロード中...</option>
+  </select>
 </div>
 
 <div id="app">
   <div class="card" style="text-align: center; color: var(--sub);">
-    上のボタンから問題ファイル（JSON）を選択すると、学習がスタートできます。
+    上のメニューから問題集を選択すると、詳細設定が開きます。
   </div>
 </div>
 
 </div>
 
-<div class="modal-overlay" id="customModal" onclick="closeModal(event)">
-  <div class="modal-card" onclick="event.stopPropagation()">
+<div class="modal-overlay" id="customModal">
+  <div class="modal-card">
     <div class="modal-header" id="modalTitle">📊 システム通知</div>
     <div class="modal-body" id="modalBody">メッセージ</div>
     <div class="button-row center">
-      <button class="main-btn" style="width: 100%;" onclick="hideModal()">閉じる</button>
+      <button class="main-btn" style="width: 100%;" id="modalCloseBtn">閉じる</button>
     </div>
   </div>
 </div>
 
-<script>
-let originalQuiz = null;
-let quiz = null;
-let index = 0;
-let score = 0;
-let streak = 0;
-let results = [];
-let misses = [];
-let totalCountGlobal = 0; 
-let nextTimer = null;
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-function initQuestions(quizObj) {
-  if(!quizObj || !quizObj.questions) return;
-  quizObj.questions.forEach(q => {
-    if (!q.stats) q.stats = { correct: 0, wrong: 0 };
-    if (!q.statsHistory) q.statsHistory = [];
-    if (!q.unit) q.unit = q.status || "共通単元";
-  });
-}
-
-/* ============================
-   データ保存・読込
-============================ */
-function saveLocalStats(){
-  if(!originalQuiz) return;
-  localStorage.setItem("userQuizStats", JSON.stringify(originalQuiz.questions.map(q => q.stats)));
-  localStorage.setItem("userQuizStatsHistory", JSON.stringify(originalQuiz.questions.map(q => q.statsHistory || [])));
-  localStorage.setItem("userQuizTotalCount", totalCountGlobal);
-}
-
-function loadLocalStats(){
-  if(!originalQuiz) return;
-  const savedStats = localStorage.getItem("userQuizStats");
-  if(savedStats) {
-    const stats = JSON.parse(savedStats);
-    originalQuiz.questions.forEach((q, i) => { if(stats[i]) q.stats = stats[i]; });
-  }
-  const savedHistory = localStorage.getItem("userQuizStatsHistory");
-  if(savedHistory) {
-    const history = JSON.parse(savedHistory);
-    originalQuiz.questions.forEach((q, i) => { if(history[i]) q.statsHistory = history[i]; });
-  }
-  const savedGlobalCount = localStorage.getItem("userQuizTotalCount");
-  if(savedGlobalCount) totalCountGlobal = parseInt(savedGlobalCount);
-}
-
-/* ============================
-   ファイル制御
-============================ */
-document.getElementById("fileInput").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  document.getElementById("fileName").textContent = "読込完了：" + file.name;
-  const reader = new FileReader();
-  reader.onload = function () {
-    try {
-      originalQuiz = JSON.parse(reader.result);
-      initQuestions(originalQuiz);
-      loadLocalStats();
-      showStart();
-    } catch(err) {
-      openModal("⚠️ エラー", "ファイル形式が正しくありません。");
-    }
+  const firebaseConfig = {
+    apiKey: "AIzaSyCV2acb2e09L-2iedCJPJtEpsoN8i8L4v0",
+    authDomain: "quiz-maker-6259f.firebaseapp.com",
+    projectId: "quiz-maker-6259f",
+    storageBucket: "quiz-maker-6259f.firebasestorage.app",
+    messagingSenderId: "671224317335",
+    appId: "1:671224317335:web:24baa4a56291ea19a630d2",
+    measurementId: "G-0Q8ZKMS07B"
   };
-  reader.readAsText(file);
-});
 
-document.getElementById("progressInput").addEventListener("change", e => {
-  if(!originalQuiz) { openModal("⚠️ 注意", "先に問題ファイルを読み込んでください。"); return; }
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // グローバル状態管理
+  let originalQuiz = null;   // クラウドから取得した元データ
+  let quizDocId = null;      // 選択中ドキュメントID(上書き保存用)
+  let quiz = null;           // 抽出・調整された出題用キュー
+  let index = 0;
+  let score = 0;
+  let streak = 0;
+  let results = [];
+  let misses = [];
+  let totalCountGlobal = 0; 
+  let nextTimer = null;
+
+  // DOM要素
+  const quizSelect = document.getElementById("quizSelect");
+  const appArea = document.getElementById("app");
+
+  // イベント登録
+  quizSelect.onchange = handleQuizSelect;
+  document.getElementById("modalCloseBtn").onclick = hideModal;
+
+  // 起動時に問題集一覧を取得
+  window.addEventListener("DOMContentLoaded", fetchQuizList);
+  window.addEventListener("DOMContentLoaded", loadGlobalCount);
+
+  // 全体システム解答回数をローカルに保持
+  function loadGlobalCount() {
+    const savedGlobalCount = localStorage.getItem("userQuizTotalCount");
+    if(savedGlobalCount) totalCountGlobal = parseInt(savedGlobalCount);
+  }
+  function saveGlobalCount() {
+    localStorage.setItem("userQuizTotalCount", totalCountGlobal);
+  }
+
+  async function fetchQuizList() {
     try {
-      const data = JSON.parse(reader.result);
-      originalQuiz.questions.forEach((q, i) => {
-        if (data.statsHistory && data.statsHistory[i]) q.statsHistory = data.statsHistory[i];
-        if (data.stats && data.stats[i]) q.stats = data.stats[i];
+      const querySnapshot = await getDocs(collection(db, "quizzes"));
+      quizSelect.innerHTML = "";
+
+      if(querySnapshot.empty) {
+        quizSelect.innerHTML = '<option value="">クラウドに問題集が登録されていません</option>';
+        return;
+      }
+
+      const defaultOpt = document.createElement("option");
+      defaultOpt.value = "";
+      defaultOpt.textContent = " -- 問題集を選択してください -- ";
+      quizSelect.appendChild(defaultOpt);
+
+      querySnapshot.forEach((doc) => {
+        const opt = document.createElement("option");
+        opt.value = doc.id;
+        opt.textContent = doc.data().title || "無題の問題集";
+        quizSelect.appendChild(opt);
       });
-      openModal("💾 復元完了", "進捗データを復元しました。");
-      showStart();
     } catch(err) {
-      openModal("⚠️ エラー", "進捗ファイルの解析に失敗しました。");
+      console.error(err);
+      quizSelect.innerHTML = '<option value="">❌ 問題集の一覧取得に失敗しました</option>';
     }
-  };
-  reader.readAsText(file);
-});
-
-function exportProgress() {
-  if(!originalQuiz) { openModal("⚠️ 注意", "データがありません。"); return; }
-  const data = {
-    stats: originalQuiz.questions.map(q => q.stats),
-    statsHistory: originalQuiz.questions.map(q => q.statsHistory || [])
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `quiz_accuracy_progress.json`; a.click();
-  URL.revokeObjectURL(url);
-}
-
-/* ============================
-   共通ロジック
-============================ */
-function normalize(str){
-  return str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, "").trim().toLowerCase();
-}
-
-function shuffle(arr){
-  for(let i = arr.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-}
 
-function getUnitStats() {
-  const map = {};
-  if(!originalQuiz) return map;
-  originalQuiz.questions.forEach(q => {
-    const unitName = q.unit || "共通単元";
-    if (!map[unitName]) map[unitName] = { correct: 0, total: 0 };
-    
-    if(q.statsHistory && q.statsHistory.length > 0) {
-      q.statsHistory.forEach(v => { map[unitName].correct += v; map[unitName].total += 1; });
-    } else {
-      map[unitName].correct += q.stats.correct;
-      map[unitName].total += (q.stats.correct + q.stats.wrong);
+  async function handleQuizSelect() {
+    quizDocId = quizSelect.value;
+    if(!quizDocId) {
+      appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">上のメニューから問題集を選択すると、詳細設定が開きます。</div>`;
+      return;
     }
-  });
-  return map;
-}
 
-function openModal(title, message) {
-  document.getElementById("modalTitle").textContent = title;
-  document.getElementById("modalBody").textContent = message;
-  document.getElementById("customModal").classList.add("active");
-}
-function hideModal() { document.getElementById("customModal").classList.remove("active"); }
-function closeModal(e) { if(e.target.id === "customModal") hideModal(); }
+    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドからデータをダウンロード中...</div>`;
 
-// 全選択・全解除の制御と連動視覚エフェクト
-function toggleAllCheckboxes(master) {
-  const checkboxes = document.querySelectorAll('.category-check');
-  checkboxes.forEach(cb => {
-    cb.checked = master.checked;
-    updateLabelStyle(cb);
-  });
-}
-
-function updateLabelStyle(checkbox) {
-  const label = checkbox.closest('.unit-row-label');
-  if(!label) return;
-  if(checkbox.checked) {
-    label.classList.remove('disabled');
-  } else {
-    label.classList.add('disabled');
-  }
-}
-
-/* ============================
-   ダッシュボード（スタート画面）
-============================ */
-function showStart(){
-  clearTimeout(nextTimer);
-  window.removeEventListener("keydown", handleEnterNext);
-  document.getElementById("fileControlCard").style.display = "block";
-  if(!originalQuiz) return;
-
-  // 単元ごとの正答率統計を取得
-  const stats = getUnitStats();
-  const uniqueCategories = [...new Set(originalQuiz.questions.map(q => q.unit || "共通単元"))];
-  
-  let unitListHTML = "";
-  uniqueCategories.forEach(cat => {
-    const s = stats[cat] || { correct: 0, total: 0 };
-    const rate = s.total === 0 ? 0 : Math.round((s.correct / s.total) * 100);
-    
-    unitListHTML += `
-      <label class="unit-row-label">
-        <input type="checkbox" class="category-check" value="${cat}" checked onchange="updateLabelStyle(this)">
-        <div class="unit-info">
-          <div class="unit-header-meta">
-            <span>${cat}</span>
-            <span class="unit-rate">正答率: ${rate}%</span>
-          </div>
-          <div class="bar-container">
-            <div class="bar" style="width:${rate}%"></div>
-          </div>
-        </div>
-      </label>
-    `;
-  });
-
-  app.innerHTML=`
-<div class="card">
-<h2>出題順モード</h2>
-<div class="select-grid">
-<button class="select-btn active" data-mode="normal">登録順</button>
-<button class="select-btn" data-mode="random">ランダム</button>
-<button class="select-btn" data-mode="weak">苦手セレクト（正答率が低い順）</button>
-</div>
-</div>
-
-<div class="card">
-<h2>カテゴリ・単元選択（進捗バー一体型）</h2>
-<div class="unit-list">
-  <label class="unit-row-label" style="background:transparent; border:none; padding:4px 0;">
-    <input type="checkbox" id="checkAll" checked onchange="toggleAllCheckboxes(this)">
-    <div class="unit-info" style="font-weight:bold;">すべて選択 / 解除</div>
-  </label>
-  <hr style="width:100%; border:0; border-top:1px dashed var(--border); margin:4px 0;">
-  
-  ${unitListHTML}
-  
-  <label class="unit-row-label" style="border: 1px dashed var(--bad); background: rgba(220,38,38,0.02);">
-    <input type="checkbox" class="category-check" value="miss" onchange="updateLabelStyle(this)">
-    <div class="unit-info" style="color: var(--bad); font-weight: bold;">
-      通算ミス（✕の数）が正解より多い問題のみを強制抽出
-    </div>
-  </label>
-</div>
-</div>
-
-<div class="card">
-<h2>最大出題数</h2>
-<input type="number" id="count" placeholder="指定なし（全問出題）">
-</div>
-
-<div class="card" style="background: rgba(99,102,241,0.04);">
-  <div style="font-size: 15px; color: var(--sub);">累計システム解答回数</div>
-  <div style="font-size: 32px; font-weight: bold; margin-top: 4px;">${totalCountGlobal} <span style="font-size:16px; font-weight:normal;">回</span></div>
-</div>
-
-<div class="button-row center">
-<button class="main-btn" style="width: 100%; max-width: 300px; font-weight:bold;" onclick="startQuiz()">テスト開始</button>
-</div>
-`;
-
-  document.querySelectorAll("[data-mode]").forEach(el=>{
-    el.onclick=()=>{
-      document.querySelectorAll("[data-mode]").forEach(e=>e.classList.remove("active"));
-      el.classList.add("active");
-    };
-  });
-}
-
-/* ============================
-   問題実行
-============================ */
-function startQuiz(){
-  score=0; streak=0; index=0; results=[]; misses=[];
-  const mode=document.querySelector("[data-mode].active").dataset.mode;
-  const limit=parseInt(document.getElementById("count").value);
-  const checkedBoxes = document.querySelectorAll('.category-check:checked');
-  const selectedStatuses = Array.from(checkedBoxes).map(cb => cb.value);
-
-  if(selectedStatuses.length === 0) {
-    openModal("⚠️ エラー", "カテゴリを1つ以上選択してください。");
-    return;
+    try {
+      const docSnap = await getDoc(doc(db, "quizzes", quizDocId));
+      if(docSnap.exists()) {
+        originalQuiz = docSnap.data();
+        // データの初期互換処理
+        if(!originalQuiz.questions) originalQuiz.questions = [];
+        originalQuiz.questions.forEach(q => {
+          if (!q.stats) q.stats = { correct: 0, wrong: 0 };
+          if (!q.statsHistory) q.statsHistory = [];
+          if (!q.unit) q.unit = q.status || "共通単元";
+        });
+        showStart();
+      }
+    } catch(err) {
+      console.error(err);
+      appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--bad);">❌ データの同期に失敗しました。</div>`;
+    }
   }
 
-  document.getElementById("fileControlCard").style.display = "none";
-
-  let baseQuestions = [];
-  const normalStatuses = selectedStatuses.filter(s => s !== "miss");
-  if(normalStatuses.length > 0) {
-    baseQuestions = originalQuiz.questions.filter(q => normalStatuses.includes(q.unit));
-  }
-
-  if(selectedStatuses.includes("miss")){
-    const missFiltered = originalQuiz.questions.filter(q => q.stats.wrong > q.stats.correct);
-    missFiltered.forEach(mq => { if(!baseQuestions.includes(mq)) baseQuestions.push(mq); });
-  }
-
-  if(mode === "random"){
-    shuffle(baseQuestions);
-  } else if(mode === "weak"){
-    baseQuestions.sort((a,b)=>{
-      const aHistory = a.statsHistory || [];
-      const bHistory = b.statsHistory || [];
-      const aCorrectRate = aHistory.length ? (aHistory.reduce((s,v)=>s+v,0)/aHistory.length) : 1;
-      const bCorrectRate = bHistory.length ? (bHistory.reduce((s,v)=>s+v,0)/bHistory.length) : 1;
-      
-      if(aCorrectRate !== bCorrectRate) return aCorrectRate - bCorrectRate;
-      return b.stats.wrong - a.stats.wrong;
-    });
-  }
-
-  quiz = { questions: baseQuestions };
-  if(!isNaN(limit) && limit > 0) quiz.questions = quiz.questions.slice(0, limit);
-
-  if(quiz.questions.length === 0){
-    openModal("ℹ️ お知らせ", "対象の問題が見つかりませんでした。");
-    showStart(); return;
-  }
-
-  showQuestion();
-}
-
-function showQuestion(){
-  clearTimeout(nextTimer);
-  window.removeEventListener("keydown", handleEnterNext);
-  
-  if(index>=quiz.questions.length){ showResult(); return; }
-
-  const q=quiz.questions[index];
-  const progress=Math.round((index/quiz.questions.length)*100);
-
-  app.innerHTML=`
-<div class="card" id="quizCard">
-<div class="effect-overlay" id="effectOverlay"></div>
-<div class="topbar">
-<div class="badge">現在の連勝: ${streak}</div>
-</div>
-<div class="progress"><div class="progress-inner" style="width:${progress}%"></div></div>
-<div style="font-size:14px; color:var(--sub); margin-bottom:4px;">単元: ${q.unit}</div>
-<div>第 ${index+1} 問 / ${quiz.questions.length}</div>
-<div class="question">${q.question}</div>
-<input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力">
-<div class="button-row">
-<button class="main-btn" onclick="checkAnswer()">判定する</button>
-<button class="danger-sub-btn" onclick="showResult()">中断して結果へ</button>
-</div>
-</div>
-`;
-
-  const input=document.getElementById("answerInput");
-  if(input) {
-    setTimeout(()=>{ input.focus(); },20);
-    input.addEventListener("keydown",e=>{ if(e.key==="Enter"){ checkAnswer(); } });
-  }
-}
-
-function checkAnswer(){
-  const input=document.getElementById("answerInput");
-  if(!input) return;
-  const user = input.value.trim();
-  if(!user) return; 
-
-  totalCountGlobal += 1;
-  const q=quiz.questions[index];
-  const correct = normalize(user) === normalize(q.answer);
-
-  if(correct){
-    score++; streak++; q.stats.correct++; q.statsHistory.push(1);
-  }else{
-    streak=0; q.stats.wrong++; q.statsHistory.push(0); misses.push(q);
-  }
-  if(q.statsHistory.length > 5) q.statsHistory.shift();
-
-  results.push({ question: q.question, user: user, answer: q.answer, correct });
-  saveLocalStats();
-
-  const card = document.getElementById("quizCard");
-  const overlay = document.getElementById("effectOverlay");
-  if(correct) {
-    overlay.textContent = "⭕"; overlay.style.color = "var(--good)"; overlay.classList.add("animate-ok");
-  } else {
-    overlay.textContent = "❌"; overlay.style.color = "var(--bad)"; overlay.classList.add("animate-ng"); card.classList.add("shake");
-  }
-
-  setTimeout(() => { showJudge(correct, q.answer); }, 600);
-}
-
-function showJudge(correct, answer){
-  app.innerHTML=`
-<div class="card" style="text-align:center;">
-<h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解！':'不正解'}</h2>
-${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
-${correct ? `<div style="color:var(--sub); margin-bottom:10px; font-size:16px;">1秒後に次の問題に進みます</div>` : ''}
-<div class="button-row" style="justify-content:center;">
-<button class="main-btn" id="nextBtn" onclick="nextQuestion()">次へ (Enter)</button>
-<button class="danger-sub-btn" onclick="showResult()">終了</button>
-</div>
-</div>
-`;
-  const nextBtn = document.getElementById("nextBtn");
-  if(nextBtn) setTimeout(()=>{ nextBtn.focus(); }, 20);
-  if(correct) nextTimer = setTimeout(nextQuestion, 1000);
-  window.addEventListener("keydown", handleEnterNext);
-}
-
-function handleEnterNext(e){
-  if(e.key==="Enter"){
-    e.preventDefault();
+  // スタート画面（ダッシュボード）表示
+  function showStart(){
+    clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    nextQuestion();
+    document.getElementById("quizSelectCard").style.display = "block";
+    
+    if(!originalQuiz) return;
+
+    // 単元ごとの統計を計算
+    const stats = {};
+    originalQuiz.questions.forEach(q => {
+      const unitName = q.unit || "共通単元";
+      if (!stats[unitName]) stats[unitName] = { correct: 0, total: 0 };
+      
+      if(q.statsHistory && q.statsHistory.length > 0) {
+        q.statsHistory.forEach(v => { stats[unitName].correct += v; stats[unitName].total += 1; });
+      } else {
+        stats[unitName].correct += q.stats.correct;
+        stats[unitName].total += (q.stats.correct + q.stats.wrong);
+      }
+    });
+
+    const uniqueCategories = [...new Set(originalQuiz.questions.map(q => q.unit || "共通単元"))];
+    
+    let unitListHTML = "";
+    uniqueCategories.forEach(cat => {
+      const s = stats[cat] || { correct: 0, total: 0 };
+      const rate = s.total === 0 ? 0 : Math.round((s.correct / s.total) * 100);
+      
+      unitListHTML += `
+        <label class="unit-row-label" id="label_${cat}">
+          <input type="checkbox" class="category-check" value="${cat}" checked>
+          <div class="unit-info">
+            <div class="unit-header-meta">
+              <span>${cat}</span>
+              <span class="unit-rate">正答率: ${rate}%</span>
+            </div>
+            <div class="bar-container">
+              <div class="bar" style="width:${rate}%"></div>
+            </div>
+          </div>
+        </label>
+      `;
+    });
+
+    appArea.innerHTML = `
+      <div class="card">
+        <h2>出題順モード</h2>
+        <div class="select-grid">
+          <button class="select-btn active" data-mode="normal">登録順</button>
+          <button class="select-btn" data-mode="random">ランダム</button>
+          <button class="select-btn" data-mode="weak">苦手セレクト（正答率が低い順）</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>カテゴリ・単元選択（進捗バー一体型）</h2>
+        <div class="unit-list">
+          <label class="unit-row-label" style="background:transparent; border:none; padding:4px 0;">
+            <input type="checkbox" id="checkAll" checked>
+            <div class="unit-info" style="font-weight:bold;">すべて選択 / 解除</div>
+          </label>
+          <hr style="width:100%; border:0; border-top:1px dashed var(--border); margin:4px 0;">
+          
+          <div id="dynamicUnitContainer">${unitListHTML}</div>
+          
+          <label class="unit-row-label" id="label_miss" style="border: 1px dashed var(--bad); background: rgba(220,38,38,0.02);">
+            <input type="checkbox" class="category-check" value="miss">
+            <div class="unit-info" style="color: var(--bad); font-weight: bold;">
+              通算ミス（✕の数）が正解より多い問題のみを強制抽出
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>最大出題数</h2>
+        <input type="number" id="count" placeholder="指定なし（全問出題）">
+      </div>
+
+      <div class="card" style="background: rgba(99,102,241,0.04);">
+        <div style="font-size: 15px; color: var(--sub);">累計システム解答回数</div>
+        <div style="font-size: 32px; font-weight: bold; margin-top: 4px;">${totalCountGlobal} <span style="font-size:16px; font-weight:normal;">回</span></div>
+      </div>
+
+      <div class="button-row center">
+        <button class="main-btn" id="startQuizBtn" style="width: 100%; max-width: 300px;">テスト開始</button>
+      </div>
+    `;
+
+    // モード切り替えイベントバインド
+    appArea.querySelectorAll("[data-mode]").forEach(el=>{
+      el.onclick=()=>{
+        appArea.querySelectorAll("[data-mode]").forEach(e=>e.classList.remove("active"));
+        el.classList.add("active");
+      };
+    });
+
+    // チェックボックス視覚連動バインド
+    const cbs = appArea.querySelectorAll(".category-check");
+    cbs.forEach(cb => {
+      cb.onchange = () => {
+        const label = appArea.querySelector(`#label_${CSS.escape(cb.value)}`);
+        if(label) cb.checked ? label.classList.remove('disabled') : label.classList.add('disabled');
+      };
+    });
+
+    // 全選択・全解除制御
+    const checkAll = appArea.querySelector("#checkAll");
+    checkAll.onchange = () => {
+      cbs.forEach(cb => {
+        cb.checked = checkAll.checked;
+        const label = appArea.querySelector(`#label_${CSS.escape(cb.value)}`);
+        if(label) checkAll.checked ? label.classList.remove('disabled') : label.classList.add('disabled');
+      });
+    };
+
+    appArea.querySelector("#startQuizBtn").onclick = startQuiz;
   }
-}
 
-function nextQuestion(){
-  window.removeEventListener("keydown", handleEnterNext);
-  clearTimeout(nextTimer);
-  index++; showQuestion();
-}
+  // クイズ構築・開始
+  function startQuiz(){
+    score=0; streak=0; index=0; results=[]; misses=[];
+    const mode = appArea.querySelector("[data-mode].active").dataset.mode;
+    const limit = parseInt(appArea.querySelector("#count").value);
+    const checkedBoxes = appArea.querySelectorAll('.category-check:checked');
+    const selectedStatuses = Array.from(checkedBoxes).map(cb => cb.value);
 
-/* ============================
-   リザルト
-============================ */
-function retryMisses(){
-  if(misses.length===0){ openModal("🎉 パーフェクト！", "ミスした問題はありません。"); return; }
-  quiz={questions:[...misses]};
-  index=0; score=0; results=[]; misses=[];
-  showQuestion();
-}
+    if(selectedStatuses.length === 0) {
+      openModal("⚠️ エラー", "カテゴリを1つ以上選択してください。");
+      return;
+    }
 
-function showResult(){
-  clearTimeout(nextTimer);
-  window.removeEventListener("keydown", handleEnterNext);
-  document.getElementById("fileControlCard").style.display = "block";
+    document.getElementById("quizSelectCard").style.display = "none";
 
-  const total=results.length;
-  if(total === 0) { showStart(); return; }
-  const rate=Math.round((score/total)*100);
+    let baseQuestions = [];
+    const normalStatuses = selectedStatuses.filter(s => s !== "miss");
+    
+    // 選ばれた単元に属する問題を、元配列のインデックスを保持させつつ抽出
+    originalQuiz.questions.forEach((q, originalIdx) => {
+      if(normalStatuses.includes(q.unit)) {
+        baseQuestions.push({ ...q, originalIdx: originalIdx });
+      }
+    });
 
-  let detail="";
-  results.forEach((r,i)=>{
-    detail += `
-<div class="result-item">
-<b>#${i+1}：</b>${r.question}<br>入力：${r.user} | 正解：${r.answer} <span class="${r.correct ? 'good':'bad'}" style="font-weight:bold; float:right;">${r.correct ? '◯':'✕'}</span>
-</div>`;
-  });
+    // 苦手問題強制抽出ロジック
+    if(selectedStatuses.includes("miss")){
+      originalQuiz.questions.forEach((mq, originalIdx) => {
+        const isAlreadyAdded = baseQuestions.some(bq => bq.originalIdx === originalIdx);
+        if(!isAlreadyAdded && (mq.stats.wrong > mq.stats.correct)){
+          baseQuestions.push({ ...mq, originalIdx: originalIdx });
+        }
+      });
+    }
 
-  app.innerHTML=`
-<div class="card">
-<h2>テスト結果</h2>
-<div class="stats">
-<div class="stat"><div>最終スコア</div><div class="stat-value">${score} / ${total}</div></div>
-<div class="stat"><div>今回の正答率</div><div class="stat-value">${rate}%</div></div>
-</div>
-<div class="progress"><div class="progress-inner" style="width:${rate}%"></div></div>
-<div class="button-row">
-<button class="main-btn" id="retryBtn" onclick="retryMisses()">間違えた問題だけ再挑戦</button>
-<button class="sub-btn" onclick="showStart()">最初に戻る</button>
-</div>
-<h2 style="margin-top:24px;">今回の解答履歴</h2>
-${detail}
-</div>
-`;
-  const retryBtn = document.getElementById("retryBtn");
-  if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
-}
+    // 出題順並べ替え
+    if(mode === "random"){
+      // シャッフル
+      for(let i = baseQuestions.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [baseQuestions[i], baseQuestions[j]] = [baseQuestions[j], baseQuestions[i]];
+      }
+    } else if(mode === "weak"){
+      baseQuestions.sort((a,b)=>{
+        const aHistory = a.statsHistory || [];
+        const bHistory = b.statsHistory || [];
+        const aCorrectRate = aHistory.length ? (aHistory.reduce((s,v)=>s+v,0)/aHistory.length) : 1;
+        const bCorrectRate = bHistory.length ? (bHistory.reduce((s,v)=>s+v,0)/bHistory.length) : 1;
+        
+        if(aCorrectRate !== bCorrectRate) return aCorrectRate - bCorrectRate;
+        return b.stats.wrong - a.stats.wrong; // 履歴が同じなら通算ミスが多い順
+      });
+    }
+
+    quiz = { questions: baseQuestions };
+    if(!isNaN(limit) && limit > 0) quiz.questions = quiz.questions.slice(0, limit);
+
+    if(quiz.questions.length === 0){
+      openModal("ℹ️ お知らせ", "対象の問題が見つかりませんでした。");
+      showStart(); return;
+    }
+
+    showQuestion();
+  }
+
+  // クイズ実行表示
+  function showQuestion(){
+    clearTimeout(nextTimer);
+    window.removeEventListener("keydown", handleEnterNext);
+    
+    if(index >= quiz.questions.length){ showResult(); return; }
+
+    const q = quiz.questions[index];
+    const progress = Math.round((index / quiz.questions.length) * 100);
+
+    appArea.innerHTML = `
+      <div class="card" id="quizCard">
+        <div class="effect-overlay" id="effectOverlay"></div>
+        <div class="topbar">
+          <div class="badge">現在の連勝: ${streak}</div>
+        </div>
+        <div class="progress"><div class="progress-inner" style="width:${progress}%"></div></div>
+        <div style="font-size:14px; color:var(--sub); margin-bottom:4px;">単元: ${q.unit}</div>
+        <div>第 ${index+1} 問 / ${quiz.questions.length}</div>
+        <div class="question">${q.question}</div>
+        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力">
+        <div class="button-row">
+          <button class="main-btn" id="judgeBtn">判定する</button>
+          <button class="danger-sub-btn" id="quitBtn">中断して結果へ</button>
+        </div>
+      </div>
+    `;
+
+    const input = appArea.querySelector("#answerInput");
+    if(input) {
+      setTimeout(()=>{ input.focus(); }, 20);
+      input.addEventListener("keydown", e => { if(e.key === "Enter"){ checkAnswer(); } });
+    }
+    appArea.querySelector("#judgeBtn").onclick = checkAnswer;
+    appArea.querySelector("#quitBtn").onclick = showResult;
+  }
+
+  // 解答判定・エフェクト演出
+  async function checkAnswer(){
+    const input = appArea.querySelector("#answerInput");
+    if(!input) return;
+    const user = input.value.trim();
+    if(!user) return; 
+
+    totalCountGlobal += 1;
+    saveGlobalCount();
+
+    const q = quiz.questions[index];
+    // 元データ（originalQuiz）への正確な参照を確保
+    const original = originalQuiz.questions[q.originalIdx];
+
+    const correct = normalize(user) === normalize(q.answer);
+
+    if(correct){
+      score++; streak++; original.stats.correct++; original.statsHistory.push(1);
+    } else {
+      streak=0; original.stats.wrong++; original.statsHistory.push(0); misses.push(q);
+    }
+    if(original.statsHistory.length > 5) original.statsHistory.shift();
+
+    results.push({ question: q.question, user: user, answer: q.answer, correct });
+    
+    // 解答ごとにクラウドへ進捗をサイレントセーブ
+    try {
+      await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
+    } catch(e) {
+      console.error("Firebaseへの同期に失敗しました", e);
+    }
+
+    const card = appArea.querySelector("#quizCard");
+    const overlay = appArea.querySelector("#effectOverlay");
+    if(correct) {
+      overlay.textContent = "⭕"; overlay.style.color = "var(--good)"; overlay.classList.add("animate-ok");
+    } else {
+      overlay.textContent = "❌"; overlay.style.color = "var(--bad)"; overlay.classList.add("animate-ng"); card.classList.add("shake");
+    }
+
+    setTimeout(() => { showJudge(correct, q.answer); }, 600);
+  }
+
+  // 判定表示画面
+  function showJudge(correct, answer){
+    appArea.innerHTML = `
+      <div class="card" style="text-align:center;">
+        <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解！':'不正解'}</h2>
+        ${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
+        ${correct ? `<div style="color:var(--sub); margin-bottom:10px; font-size:16px;">1秒後に次の問題に進みます</div>` : ''}
+        <div class="button-row" style="justify-content:center;">
+          <button class="main-btn" id="nextBtn">次へ (Enter)</button>
+          <button class="danger-sub-btn" id="exitBtn">終了</button>
+        </div>
+      </div>
+    `;
+    
+    const nextBtn = appArea.querySelector("#nextBtn");
+    if(nextBtn) setTimeout(()=>{ nextBtn.focus(); }, 20);
+    
+    appArea.querySelector("#nextBtn").onclick = nextQuestion;
+    appArea.querySelector("#exitBtn").onclick = showResult;
+
+    if(correct) nextTimer = setTimeout(nextQuestion, 1000);
+    window.addEventListener("keydown", handleEnterNext);
+  }
+
+  function handleEnterNext(e){
+    if(e.key === "Enter"){
+      e.preventDefault();
+      window.removeEventListener("keydown", handleEnterNext);
+      nextQuestion();
+    }
+  }
+
+  function nextQuestion(){
+    window.removeEventListener("keydown", handleEnterNext);
+    clearTimeout(nextTimer);
+    index++; showQuestion();
+  }
+
+  // 結果（リザルト）画面
+  function showResult(){
+    clearTimeout(nextTimer);
+    window.removeEventListener("keydown", handleEnterNext);
+    document.getElementById("quizSelectCard").style.display = "block";
+
+    const total = results.length;
+    if(total === 0) { showStart(); return; }
+    const rate = Math.round((score / total) * 100);
+
+    let detail = "";
+    results.forEach((r, i)=>{
+      detail += `
+        <div class="result-item">
+          <b>#${i+1}：</b>${r.question}<br>
+          入力：${r.user} | 正解：${r.answer} 
+          <span class="${r.correct ? 'good':'bad'}" style="font-weight:bold; float:right;">${r.correct ? '◯':'✕'}</span>
+        </div>`;
+    });
+
+    appArea.innerHTML = `
+      <div class="card">
+        <h2>テスト結果</h2>
+        <div class="stats">
+          <div class="stat"><div>最終スコア</div><div class="stat-value">${score} / ${total}</div></div>
+          <div class="stat"><div>今回の正答率</div><div class="stat-value">${rate}%</div></div>
+        </div>
+        <div class="progress"><div class="progress-inner" style="width:${rate}%"></div></div>
+        <div class="button-row">
+          <button class="main-btn" id="retryBtn">間違えた問題だけ再挑戦</button>
+          <button class="sub-btn" id="backToMenuBtn">最初に戻る</button>
+        </div>
+        <h2 style="margin-top:24px;">今回の解答履歴</h2>
+        ${detail}
+      </div>
+    `;
+
+    const retryBtn = appArea.querySelector("#retryBtn");
+    if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
+
+    appArea.querySelector("#retryBtn").onclick = retryMisses;
+    appArea.querySelector("#backToMenuBtn").onclick = showStart;
+  }
+
+  // 間違えた問題だけで再シャッフル・再挑戦
+  function retryMisses(){
+    if(misses.length === 0){ 
+      openModal("🎉 パーフェクト！", "ミスした問題はありません。"); 
+      return; 
+    }
+    // originalIdxを保持したままキューを再構成
+    quiz = { questions: [...misses] };
+    index=0; score=0; results=[]; misses=[];
+    document.getElementById("quizSelectCard").style.display = "none";
+    showQuestion();
+  }
+
+  // ユーティリティ群
+  function normalize(str){
+    return str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, "").trim().toLowerCase();
+  }
+
+  function openModal(title, message) {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalBody").textContent = message;
+    document.getElementById("customModal").classList.add("active");
+  }
+  function hideModal() { 
+    document.getElementById("customModal").classList.remove("active"); 
+  }
 </script>
 </body>
 </html>
