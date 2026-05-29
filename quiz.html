@@ -17,6 +17,12 @@
   --bad:#dc2626;
   --border:#dbe4ff;
   --bar-bg:#e2e8f0;
+  
+  /* 暗記モード用カラー */
+  --rank1:#f59e0b; /* 黄色 */
+  --rank2:#84cc16; /* 黄緑色 */
+  --rank3:#22c55e; /* 緑色 */
+  --rank0:#cbd5e1; /* 未達成（灰色） */
 }
 
 @media (prefers-color-scheme: dark){
@@ -24,9 +30,9 @@
     --bg:#0f172a;
     --card:#111827;
     --text:#f8fafc;
-    --sub:#94a3b8;
     --border:#334155;
     --bar-bg:#334155;
+    --rank0:#475569;
   }
 }
 
@@ -69,7 +75,7 @@ h2{
   position: relative;
 }
 
-/* --- 改良：問題集選択カード自体の折りたたみヘッダー --- */
+/* 問題集選択カード自体の折りたたみヘッダー */
 .quiz-select-header {
   display: flex;
   align-items: center;
@@ -79,7 +85,7 @@ h2{
 }
 
 .quiz-select-body {
-  max-height: 1000px; /* 十分な高さ */
+  max-height: 1000px;
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
   margin-top: 16px;
@@ -158,7 +164,7 @@ h2{
   display: inline-block;
 }
 
-/* 全体共通のトグル（^）ボタン */
+/* 全体共通のトグルボタン */
 .toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -297,6 +303,47 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   transition: width 0.3s ease;
 }
 
+/* 5問ごとの複合スタックバー用スタイル */
+.stacked-bar-container {
+  display: flex;
+  width: 100%;
+  height: 24px;
+  background: var(--bar-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+.stacked-segment {
+  height: 100%;
+  transition: width 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.legend-container {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
 .main-btn, .sub-btn, .danger-sub-btn{
   border:none;
   border-radius:16px;
@@ -392,7 +439,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   margin-top:8px;
 }
 
-/* ⭕❌ポップアップエフェクト */
+/* 判定ポップアップエフェクト */
 .effect-overlay {
   position: absolute;
   top: 50%; left: 50%;
@@ -461,13 +508,13 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
 <div class="card" id="quizSelectCard">
   <div class="quiz-select-header" id="mainQuizToggleHeader">
-    <h2>📚 問題集を選択</h2>
+    <h2>問題集を選択</h2>
     <button class="toggle-btn" id="mainQuizToggleBtn" title="問題集リストを開閉">∨</button>
   </div>
   <div class="quiz-select-body" id="mainQuizSelectBody">
     <div class="quiz-list-container" id="quizGrid">
       <div style="text-align: center; color: var(--sub); padding: 20px;">
-        ⏳ クラウドから問題集をロード中...
+        クラウドから問題集をロード中...
       </div>
     </div>
   </div>
@@ -483,7 +530,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
 <div class="modal-overlay" id="customModal">
   <div class="modal-card">
-    <div class="modal-header" id="modalTitle">📊 システム通知</div>
+    <div class="modal-header" id="modalTitle">システム通知</div>
     <div class="modal-body" id="modalBody">メッセージ</div>
     <div class="button-row center">
       <button class="main-btn" style="width: 100%;" id="modalCloseBtn">閉じる</button>
@@ -520,6 +567,11 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   let totalCountGlobal = 0; 
   let nextTimer = null;
 
+  // 暗記モード用管理状態
+  let isMemorizeMode = false; 
+  let sessionAnsweredCount = 0; 
+  let memorizeSuccessLogs = {}; 
+
   const appArea = document.getElementById("app");
   const quizGrid = document.getElementById("quizGrid");
   const quizSelectCard = document.getElementById("quizSelectCard");
@@ -528,7 +580,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   document.getElementById("modalCloseBtn").onclick = hideModal;
 
-  // 問題集選択エリア全体の開閉ロジック
   mainQuizToggleHeader.onclick = () => {
     const isCollapsed = quizSelectCard.classList.contains("collapsed");
     if (isCollapsed) {
@@ -551,14 +602,13 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     localStorage.setItem("userQuizTotalCount", totalCountGlobal);
   }
 
-  // クラウドから問題集一覧を取得して1行ずつのリストとして配置
   async function fetchQuizList() {
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
       quizGrid.innerHTML = "";
 
       if(querySnapshot.empty) {
-        quizGrid.innerHTML = '<div style="text-align: center; color: var(--sub); padding: 20px;">クラウドに問題集が登録されていません。エディタから作成してください。</div>';
+        quizGrid.innerHTML = '<div style="text-align: center; color: var(--sub); padding: 20px;">クラウドに問題集が登録されていません。</div>';
         return;
       }
 
@@ -586,7 +636,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
         const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
 
-        // 1行アイテムコンテナの作成
         const rowItem = document.createElement("div");
         rowItem.className = "quiz-row-item";
         rowItem.id = `row_${doc.id}`;
@@ -606,10 +655,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           </div>
         `;
         
-        // 1行丸ごとクリックで問題集を選択し、大枠を閉じる
         rowItem.onclick = () => {
           selectQuiz(doc.id);
-          // 問題集を選んだら、自動で問題集選択枠を閉じて画面をスッキリさせる
           quizSelectCard.classList.add("collapsed");
           mainQuizToggleBtn.textContent = "^";
         };
@@ -618,21 +665,18 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       });
     } catch(err) {
       console.error(err);
-      quizGrid.innerHTML = '<div style="text-align: center; color: var(--bad); padding: 20px;">❌ 問題集の一覧取得に失敗しました</div>';
+      quizGrid.innerHTML = '<div style="text-align: center; color: var(--bad); padding: 20px;">問題集の一覧取得に失敗しました</div>';
     }
   }
 
-  // 問題集を選択した時の処理
   async function selectQuiz(id) {
     quizDocId = id;
-
-    // リストのアクティブスタイルを切り替え
     document.querySelectorAll(".quiz-row-item").forEach(el => el.classList.remove("active"));
     const activeRow = document.getElementById(`row_${id}`);
     if(activeRow) activeRow.classList.add("active");
 
     const titleText = activeRow.querySelector('.quiz-row-title span').textContent;
-    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドから「${titleText}」を読み込んでいます...</div>`;
+    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">クラウドから「${titleText}」を読み込んでいます...</div>`;
 
     try {
       const docSnap = await getDoc(doc(db, "quizzes", quizDocId));
@@ -653,14 +697,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       }
     } catch(err) {
       console.error(err);
-      appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--bad);">❌ データの同期に失敗しました。</div>`;
+      appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--bad);">データの同期に失敗しました。</div>`;
     }
   }
 
   function showStart(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    quizSelectCard.style.display = "block"; // 開始（設定）画面では表示する
+    quizSelectCard.style.display = "block";
     
     if(!originalQuiz) return;
 
@@ -668,13 +712,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     originalQuiz.questions.forEach(q => {
       const unitName = q.unit || "共通単元";
       if (!stats[unitName]) stats[unitName] = { correct: 0, total: 0 };
-      
-      if(q.statsHistory && q.statsHistory.length > 0) {
-        q.statsHistory.forEach(v => { stats[unitName].correct += v; stats[unitName].total += 1; });
-      } else {
-        stats[unitName].correct += q.stats.correct;
-        stats[unitName].total += (q.stats.correct + q.stats.wrong);
-      }
+      stats[unitName].correct += q.stats.correct;
+      stats[unitName].total += (q.stats.correct + q.stats.wrong);
     });
 
     const uniqueCategories = [...new Set(originalQuiz.questions.map(q => q.unit || "共通単元"))];
@@ -702,16 +741,17 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     appArea.innerHTML = `
       <div class="card">
-        <h2>出題順モード</h2>
+        <h2>モード選択</h2>
         <div class="select-grid">
-          <button class="select-btn active" data-mode="normal">登録順</button>
-          <button class="select-btn" data-mode="random">ランダム</button>
-          <button class="select-btn" data-mode="weak">苦手セレクト（正答率が低い順）</button>
+          <button class="select-btn active" data-mode="normal">テストモード（登録順）</button>
+          <button class="select-btn" data-mode="random">テストモード（ランダム）</button>
+          <button class="select-btn" data-mode="weak">苦手セレクト（正答率順）</button>
+          <button class="select-btn" data-mode="memorize">確率変動・暗記モード</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>カテゴリ・単元選択（進捗バー一体型）</h2>
+        <h2>カテゴリ・単元選択</h2>
         <div class="unit-list">
           <label class="unit-row-label" style="background:transparent; border:none; padding:4px 0;">
             <input type="checkbox" id="checkAll" checked>
@@ -724,13 +764,13 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           <label class="unit-row-label" id="label_miss" style="border: 1px dashed var(--bad); background: rgba(220,38,38,0.02);">
             <input type="checkbox" class="category-check" value="miss">
             <div class="unit-info" style="color: var(--bad); font-weight: bold;">
-              通算ミス（✕の数）が正解より多い問題のみを強制抽出
+              通算ミス（不正解数）が正解より多い問題のみを強制抽出
             </div>
           </label>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="maxCountContainer">
         <h2>最大出題数</h2>
         <input type="number" id="count" placeholder="指定なし（全問出題）">
       </div>
@@ -741,7 +781,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
 
       <div class="button-row center">
-        <button class="main-btn" id="startQuizBtn" style="width: 100%; max-width: 300px;">テスト開始</button>
+        <button class="main-btn" id="startQuizBtn" style="width: 100%; max-width: 300px;">スタート</button>
       </div>
     `;
 
@@ -749,6 +789,12 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       el.onclick=()=>{
         appArea.querySelectorAll("[data-mode]").forEach(e=>e.classList.remove("active"));
         el.classList.add("active");
+        
+        if(el.dataset.mode === "memorize") {
+          document.getElementById("maxCountContainer").style.display = "none";
+        } else {
+          document.getElementById("maxCountContainer").style.display = "block";
+        }
       };
     });
 
@@ -774,17 +820,19 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   function startQuiz(){
     score=0; streak=0; index=0; results=[]; misses=[];
+    sessionAnsweredCount = 0;
+    memorizeSuccessLogs = {}; 
+
     const mode = appArea.querySelector("[data-mode].active").dataset.mode;
-    const limit = parseInt(appArea.querySelector("#count").value);
     const checkedBoxes = appArea.querySelectorAll('.category-check:checked');
     const selectedStatuses = Array.from(checkedBoxes).map(cb => cb.value);
 
     if(selectedStatuses.length === 0) {
-      openModal("⚠️ エラー", "カテゴリを1つ以上選択してください。");
+      openModal("エラー", "カテゴリを1つ以上選択してください。");
       return;
     }
 
-    quizSelectCard.style.display = "none"; // クイズ中は非表示
+    quizSelectCard.style.display = "none";
 
     let baseQuestions = [];
     const normalStatuses = selectedStatuses.filter(s => s !== "miss");
@@ -804,38 +852,273 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       });
     }
 
-    if(mode === "random"){
-      for(let i = baseQuestions.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        [baseQuestions[i], baseQuestions[j]] = [baseQuestions[j], baseQuestions[i]];
-      }
-    } else if(mode === "weak"){
-      baseQuestions.sort((a,b)=>{
-        const aHistory = a.statsHistory || [];
-        const bHistory = b.statsHistory || [];
-        const aCorrectRate = aHistory.length ? (aHistory.reduce((s,v)=>s+v,0)/aHistory.length) : 1;
-        const bCorrectRate = bHistory.length ? (bHistory.reduce((s,v)=>s+v,0)/bHistory.length) : 1;
-        
-        if(aCorrectRate !== bCorrectRate) return aCorrectRate - bCorrectRate;
-        return b.stats.wrong - a.stats.wrong;
+    if(mode === "memorize") {
+      isMemorizeMode = true;
+      quiz = { questions: baseQuestions };
+      quiz.questions.forEach(q => {
+        memorizeSuccessLogs[q.originalIdx] = 0;
       });
+      showMemorizeQuestion();
+    } else {
+      isMemorizeMode = false;
+      const limit = parseInt(appArea.querySelector("#count").value);
+      if(mode === "random"){
+        for(let i = baseQuestions.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
+          [baseQuestions[i], baseQuestions[j]] = [baseQuestions[j], baseQuestions[i]];
+        }
+      } else if(mode === "weak"){
+        baseQuestions.sort((a,b)=>{
+          const aHistory = a.statsHistory || [];
+          const bHistory = b.statsHistory || [];
+          const aCorrectRate = aHistory.length ? (aHistory.reduce((s,v)=>s+v,0)/aHistory.length) : 1;
+          const bCorrectRate = bHistory.length ? (bHistory.reduce((s,v)=>s+v,0)/bHistory.length) : 1;
+          if(aCorrectRate !== bCorrectRate) return aCorrectRate - bCorrectRate;
+          return b.stats.wrong - a.stats.wrong;
+        });
+      }
+      quiz = { questions: baseQuestions };
+      if(!isNaN(limit) && limit > 0) quiz.questions = quiz.questions.slice(0, limit);
+
+      if(quiz.questions.length === 0){
+        openModal("お知らせ", "対象の問題が見つかりませんでした。");
+        showStart(); return;
+      }
+      showQuestion();
+    }
+  }
+
+  let currentMemorizeQuestion = null;
+
+  function showMemorizeQuestion() {
+    clearTimeout(nextTimer);
+    window.removeEventListener("keydown", handleEnterNext);
+    quizSelectCard.style.display = "none";
+
+    const activePool = quiz.questions.filter(q => memorizeSuccessLogs[q.originalIdx] < 3);
+
+    if(activePool.length === 0) {
+      showMemorizeClearScreen();
+      return;
     }
 
-    quiz = { questions: baseQuestions };
-    if(!isNaN(limit) && limit > 0) quiz.questions = quiz.questions.slice(0, limit);
+    let totalWeight = 0;
+    const itemsWithWeight = activePool.map(q => {
+      const successCount = memorizeSuccessLogs[q.originalIdx];
+      let weight = 100;
+      if (successCount === 1) weight = 50;
+      if (successCount === 2) weight = 25;
+      totalWeight += weight;
+      return { q, weight };
+    });
 
-    if(quiz.questions.length === 0){
-      openModal("ℹ️ お知らせ", "対象の問題が見つかりませんでした。");
-      showStart(); return;
+    let randomWeight = Math.random() * totalWeight;
+    currentMemorizeQuestion = activePool[0]; 
+
+    for (let item of itemsWithWeight) {
+      randomWeight -= item.weight;
+      if (randomWeight <= 0) {
+        currentMemorizeQuestion = item.q;
+        break;
+      }
     }
 
-    showQuestion();
+    const currentSuccess = memorizeSuccessLogs[currentMemorizeQuestion.originalIdx];
+    let rankBadge = `<span class="badge" style="background:var(--rank0); color:#1e293b;">未達成</span>`;
+    if(currentSuccess === 1) rankBadge = `<span class="badge" style="background:var(--rank1); color:white;">1回正解</span>`;
+    if(currentSuccess === 2) rankBadge = `<span class="badge" style="background:var(--rank2); color:white;">2回正解</span>`;
+
+    appArea.innerHTML = `
+      <div class="card" id="quizCard">
+        <div class="effect-overlay" id="effectOverlay"></div>
+        <div class="topbar">
+          <div>暗記モード</div>
+          <div>${rankBadge}</div>
+        </div>
+        <div style="font-size:14px; color:var(--sub); margin-top:10px;">単元: ${currentMemorizeQuestion.unit} (残りカウント対象: ${activePool.length}問)</div>
+        <div class="question">${currentMemorizeQuestion.question}</div>
+        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力">
+        <div class="button-row">
+          <button class="main-btn" id="judgeBtn">判定する</button>
+          <button class="danger-sub-btn" id="quitBtn">暗記セッションを終了</button>
+        </div>
+      </div>
+    `;
+
+    const input = appArea.querySelector("#answerInput");
+    if(input) {
+      setTimeout(()=>{ input.focus(); }, 20);
+      input.addEventListener("keydown", e => { if(e.key === "Enter"){ checkMemorizeAnswer(); } });
+    }
+    appArea.querySelector("#judgeBtn").onclick = checkMemorizeAnswer;
+    appArea.querySelector("#quitBtn").onclick = showStart;
+  }
+
+  async function checkMemorizeAnswer() {
+    const input = appArea.querySelector("#answerInput");
+    if(!input) return;
+    const user = input.value.trim();
+    if(!user) return;
+
+    totalCountGlobal += 1;
+    saveGlobalCount();
+    sessionAnsweredCount += 1; 
+
+    const q = currentMemorizeQuestion;
+    const original = originalQuiz.questions[q.originalIdx];
+    const correct = normalize(user) === normalize(q.answer);
+
+    if(correct) {
+      memorizeSuccessLogs[q.originalIdx] = Math.min(3, memorizeSuccessLogs[q.originalIdx] + 1);
+      original.stats.correct++;
+      original.statsHistory.push(1);
+    } else {
+      memorizeSuccessLogs[q.originalIdx] = 0; 
+      original.stats.wrong++;
+      original.statsHistory.push(0);
+    }
+    if(original.statsHistory.length > 5) original.statsHistory.shift();
+
+    originalQuiz.logs[q.originalIdx] = {
+      correct: original.stats.correct,
+      wrong: original.stats.wrong,
+      history: original.statsHistory,
+      last: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
+    } catch(e) {
+      console.error(e);
+    }
+
+    const card = appArea.querySelector("#quizCard");
+    const overlay = appArea.querySelector("#effectOverlay");
+    if(correct) {
+      overlay.textContent = "○"; overlay.style.color = "var(--good)"; overlay.classList.add("animate-ok");
+    } else {
+      overlay.textContent = "×"; overlay.style.color = "var(--bad)"; overlay.classList.add("animate-ng"); card.classList.add("shake");
+    }
+
+    setTimeout(() => { showMemorizeJudge(correct, q.answer); }, 600);
+  }
+
+  function showMemorizeJudge(correct, answer) {
+    appArea.innerHTML = `
+      <div class="card" style="text-align:center;">
+        <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解':'不正解'}</h2>
+        ${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
+        
+        <div style="margin: 20px 0; padding: 12px; background: rgba(0,0,0,0.02); border-radius:12px; font-size:15px;">
+          現在の記憶度: <b>${memorizeSuccessLogs[currentMemorizeQuestion.originalIdx]} / 3 回正解</b><br>
+          <span style="font-size:12px; color:var(--sub);">※3回正解するとこのセッションでは出題されなくなります</span>
+        </div>
+
+        <div class="button-row" style="justify-content:center;">
+          <button class="main-btn" id="nextBtn">次へ (Enter)</button>
+        </div>
+      </div>
+    `;
+
+    const nextBtn = appArea.querySelector("#nextBtn");
+    if(nextBtn) setTimeout(()=>{ nextBtn.focus(); }, 20);
+
+    nextBtn.onclick = () => {
+      window.removeEventListener("keydown", handleEnterNext);
+      if(sessionAnsweredCount >= 5) {
+        sessionAnsweredCount = 0; 
+        showMemorizeProgressGraph();
+      } else {
+        showMemorizeQuestion();
+      }
+    };
+
+    window.addEventListener("keydown", handleEnterNext);
+  }
+
+  function showMemorizeProgressGraph() {
+    window.removeEventListener("keydown", handleEnterNext);
+    
+    let r0 = 0, r1 = 0, r2 = 0, r3 = 0;
+    const totalQuestions = quiz.questions.length;
+
+    quiz.questions.forEach(q => {
+      const count = memorizeSuccessLogs[q.originalIdx] || 0;
+      if (count === 0) r0++;
+      if (count === 1) r1++;
+      if (count === 2) r2++;
+      if (count === 3) r3++;
+    });
+
+    const p0 = Math.round((r0 / totalQuestions) * 100);
+    const p1 = Math.round((r1 / totalQuestions) * 100);
+    const p2 = Math.round((r2 / totalQuestions) * 100);
+    const p3 = Math.round((r3 / totalQuestions) * 100);
+
+    appArea.innerHTML = `
+      <div class="card" style="text-align: center;">
+        <h2 style="color: var(--primary); font-size:22px; margin-bottom:10px;">現在の暗記定着度（5問達成）</h2>
+        <p style="font-size:14px; color:var(--sub);">全 ${totalQuestions} 問の現在の正解回数割合です</p>
+        
+        <div class="stacked-bar-container">
+          ${r3 > 0 ? `<div class="stacked-segment" style="background:var(--rank3); width:${p3}%;">${p3}%</div>` : ''}
+          ${r2 > 0 ? `<div class="stacked-segment" style="background:var(--rank2); width:${p2}%;">${p2}%</div>` : ''}
+          ${r1 > 0 ? `<div class="stacked-segment" style="background:var(--rank1); width:${p1}%;">${p1}%</div>` : ''}
+          ${r0 > 0 ? `<div class="stacked-segment" style="background:var(--rank0); width:${p0}%; color:#1e293b;">${p0}%</div>` : ''}
+        </div>
+
+        <div class="legend-container">
+          <div class="legend-item"><div class="legend-color" style="background:var(--rank3)"></div> 3回完了 (緑): ${r3}問</div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--rank2)"></div> 2回 (黄緑): ${r2}問</div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--rank1)"></div> 1回 (黄色): ${r1}問</div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--rank0)"></div> 未達成: ${r0}問</div>
+        </div>
+
+        <div class="button-row center" style="margin-top:28px;">
+          <button class="main-btn" id="continueMemorizeBtn" style="width:100%; max-width:280px;">暗記を続ける (Enter)</button>
+        </div>
+      </div>
+    `;
+
+    const btn = appArea.querySelector("#continueMemorizeBtn");
+    if(btn) setTimeout(() => btn.focus(), 20);
+
+    btn.onclick = showMemorizeQuestion;
+
+    window.addEventListener("keydown", function graphEnter(e) {
+      if(e.key === "Enter") {
+        e.preventDefault();
+        window.removeEventListener("keydown", graphEnter);
+        showMemorizeQuestion();
+      }
+    });
+  }
+
+  function showMemorizeClearScreen() {
+    quizSelectCard.style.display = "none";
+    appArea.innerHTML = `
+      <div class="card" style="text-align: center; border: 3px solid var(--rank3);">
+        <h1 style="font-size: 48px; margin-bottom: 10px;">CLEAR</h1>
+        <h2 style="color: var(--rank3); font-size:24px; margin-bottom:20px;">すべての問題を3回正解しました</h2>
+        <p style="color:var(--sub); font-size:16px;">対象の問題がすべて暗記セッションをクリアしました。</p>
+        
+        <div class="stacked-bar-container">
+          <div class="stacked-segment" style="background:var(--rank3); width:100%;">100% COMPLETE</div>
+        </div>
+
+        <div class="button-row center" style="margin-top:24px;">
+          <button class="main-btn" id="memorizeDoneBtn" style="width:100%; max-width:240px;">メニューに戻る</button>
+        </div>
+      </div>
+    `;
+    fetchQuizList();
+    appArea.querySelector("#memorizeDoneBtn").onclick = showStart;
   }
 
   function showQuestion(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    quizSelectCard.style.display = "none"; // クイズ画面でも非表示を徹底
+    quizSelectCard.style.display = "none";
     
     if(index >= quiz.questions.length){ showResult(); return; }
 
@@ -846,7 +1129,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       <div class="card" id="quizCard">
         <div class="effect-overlay" id="effectOverlay"></div>
         <div class="topbar">
-          <div class="badge">現在の連勝: ${streak}</div>
+          <div class="badge">現在の連続正解: ${streak}</div>
         </div>
         <div class="progress"><div class="progress-inner" style="width:${progress}%"></div></div>
         <div style="font-size:14px; color:var(--sub); margin-bottom:4px;">単元: ${q.unit}</div>
@@ -901,15 +1184,15 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     try {
       await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
     } catch(e) {
-      console.error("Firebaseへの同期に失敗しました", e);
+      console.error(e);
     }
 
     const card = appArea.querySelector("#quizCard");
     const overlay = appArea.querySelector("#effectOverlay");
     if(correct) {
-      overlay.textContent = "⭕"; overlay.style.color = "var(--good)"; overlay.classList.add("animate-ok");
+      overlay.textContent = "○"; overlay.style.color = "var(--good)"; overlay.classList.add("animate-ok");
     } else {
-      overlay.textContent = "❌"; overlay.style.color = "var(--bad)"; overlay.classList.add("animate-ng"); card.classList.add("shake");
+      overlay.textContent = "×"; overlay.style.color = "var(--bad)"; overlay.classList.add("animate-ng"); card.classList.add("shake");
     }
 
     setTimeout(() => { showJudge(correct, q.answer); }, 600);
@@ -918,7 +1201,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function showJudge(correct, answer){
     appArea.innerHTML = `
       <div class="card" style="text-align:center;">
-        <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解！':'不正解'}</h2>
+        <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解':'不正解'}</h2>
         ${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
         ${correct ? `<div style="color:var(--sub); margin-bottom:10px; font-size:16px;">1秒後に次の問題に進みます</div>` : ''}
         <div class="button-row" style="justify-content:center;">
@@ -942,7 +1225,16 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(e.key === "Enter"){
       e.preventDefault();
       window.removeEventListener("keydown", handleEnterNext);
-      nextQuestion();
+      if(isMemorizeMode) {
+        if(sessionAnsweredCount >= 5) {
+          sessionAnsweredCount = 0;
+          showMemorizeProgressGraph();
+        } else {
+          showMemorizeQuestion();
+        }
+      } else {
+        nextQuestion();
+      }
     }
   }
 
@@ -955,8 +1247,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   function showResult(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
-    
-    // 【修正箇所】リザルト画面では問題選択UIを絶対に表示させない
     quizSelectCard.style.display = "none"; 
 
     const total = results.length;
@@ -990,7 +1280,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
     `;
 
-    fetchQuizList(); // クラウドデータの表示更新処理
+    fetchQuizList();
 
     const retryBtn = appArea.querySelector("#retryBtn");
     if(retryBtn && misses.length > 0) setTimeout(()=>{ retryBtn.focus(); }, 20);
@@ -1001,7 +1291,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   function retryMisses(){
     if(misses.length === 0){ 
-      openModal("🎉 パーフェクト！", "ミスした問題はありません。"); 
+      openModal("パーフェクト", "ミスした問題はありません。"); 
       return; 
     }
     quiz = { questions: [...misses] };
