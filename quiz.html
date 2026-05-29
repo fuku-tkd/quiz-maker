@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>精度重視・暗記学習ツール (Firebase統合版)</title>
+<title>精度重視・暗記学習ツール (Firebase統合・UI改良版)</title>
 
 <style>
 :root{
@@ -69,6 +69,67 @@ h2{
   position: relative;
 }
 
+/* --- 新設：問題集選択のボタンタイルUI --- */
+.quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.quiz-tile-btn {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.quiz-tile-btn:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99,102,241,0.12);
+}
+
+.quiz-tile-btn.active {
+  border-color: var(--primary);
+  background: rgba(99,102,241,0.04);
+}
+
+.quiz-tile-btn.active::after {
+  content: "✔ 選択中";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.quiz-tile-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text);
+  line-height: 1.4;
+  word-break: break-all;
+  margin-right: 40px; /* バッジと被らないように記述 */
+}
+
+.quiz-tile-count {
+  font-size: 13px;
+  color: var(--sub);
+}
+
 /* 振動アニメーション */
 .shake {
   animation: shakeAnim 0.4s ease-in-out;
@@ -79,7 +140,7 @@ h2{
   40%, 80% { transform: translateX(8px); }
 }
 
-select, input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"] {
   width: 100%;
   padding: 16px;
   border-radius: 16px;
@@ -89,7 +150,6 @@ select, input[type="text"], input[type="number"] {
   color: var(--text);
   outline: none;
 }
-select { font-size: 16px; }
 select:focus, input[type="text"]:focus, input[type="number"]:focus {
   border-color: var(--primary);
 }
@@ -340,6 +400,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   h1{font-size:26px;}
   .question{font-size:36px;}
   .button-row>*{width:100%;}
+  .quiz-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -351,14 +412,16 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
 <div class="card" id="quizSelectCard">
   <h2>問題集を選択</h2>
-  <select id="quizSelect">
-    <option value="">⏳ クラウドから問題集をロード中...</option>
-  </select>
+  <div class="quiz-grid" id="quizGrid">
+    <div style="grid-column: 1/-1; text-align: center; color: var(--sub); padding: 20px;">
+      ⏳ クラウドから問題集をロード中...
+    </div>
+  </div>
 </div>
 
 <div id="app">
   <div class="card" style="text-align: center; color: var(--sub);">
-    上のメニューから問題集を選択すると、詳細設定が開きます。
+    上のリストから問題集を選択すると、詳細設定が開きます。
   </div>
 </div>
 
@@ -392,9 +455,9 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   const db = getFirestore(app);
 
   // グローバル状態管理
-  let originalQuiz = null;   // クラウドから取得した元データ
-  let quizDocId = null;      // 選択中ドキュメントID(上書き保存用)
-  let quiz = null;           // 抽出・調整された出題用キュー
+  let originalQuiz = null;   
+  let quizDocId = null;      
+  let quiz = null;           
   let index = 0;
   let score = 0;
   let streak = 0;
@@ -403,19 +466,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   let totalCountGlobal = 0; 
   let nextTimer = null;
 
-  // DOM要素
-  const quizSelect = document.getElementById("quizSelect");
   const appArea = document.getElementById("app");
+  const quizGrid = document.getElementById("quizGrid");
 
-  // イベント登録
-  quizSelect.onchange = handleQuizSelect;
   document.getElementById("modalCloseBtn").onclick = hideModal;
 
-  // 起動時に問題集一覧を取得
   window.addEventListener("DOMContentLoaded", fetchQuizList);
   window.addEventListener("DOMContentLoaded", loadGlobalCount);
 
-  // 全体システム解答回数をローカルに保持
   function loadGlobalCount() {
     const savedGlobalCount = localStorage.getItem("userQuizTotalCount");
     if(savedGlobalCount) totalCountGlobal = parseInt(savedGlobalCount);
@@ -424,47 +482,56 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     localStorage.setItem("userQuizTotalCount", totalCountGlobal);
   }
 
+  // クラウドから問題集一覧を取得してタイル型の選択ボタンとして配置
   async function fetchQuizList() {
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
-      quizSelect.innerHTML = "";
+      quizGrid.innerHTML = "";
 
       if(querySnapshot.empty) {
-        quizSelect.innerHTML = '<option value="">クラウドに問題集が登録されていません</option>';
+        quizGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--sub); padding: 20px;">クラウドに問題集が登録されていません。エディタから作成してください。</div>';
         return;
       }
 
-      const defaultOpt = document.createElement("option");
-      defaultOpt.value = "";
-      defaultOpt.textContent = " -- 問題集を選択してください -- ";
-      quizSelect.appendChild(defaultOpt);
-
       querySnapshot.forEach((doc) => {
-        const opt = document.createElement("option");
-        opt.value = doc.id;
-        opt.textContent = doc.data().title || "無題の問題集";
-        quizSelect.appendChild(opt);
+        const data = doc.data();
+        const qCount = data.questions ? data.questions.length : 0;
+        const title = data.title || "無題の問題集";
+        
+        // ボタン型カードエレメントの作成
+        const btn = document.createElement("button");
+        btn.className = "quiz-tile-btn";
+        btn.id = `tile_${doc.id}`;
+        btn.innerHTML = `
+          <div class="quiz-tile-title">${escapeHtml(title)}</div>
+          <div class="quiz-tile-count">収録問題数: ${qCount}問</div>
+        `;
+        
+        // クリックしたときの選択処理
+        btn.onclick = () => selectQuiz(doc.id);
+        quizGrid.appendChild(btn);
       });
     } catch(err) {
       console.error(err);
-      quizSelect.innerHTML = '<option value="">❌ 問題集の一覧取得に失敗しました</option>';
+      quizGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--bad); padding: 20px;">❌ 問題集の一覧取得に失敗しました</div>';
     }
   }
 
-  async function handleQuizSelect() {
-    quizDocId = quizSelect.value;
-    if(!quizDocId) {
-      appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">上のメニューから問題集を選択すると、詳細設定が開きます。</div>`;
-      return;
-    }
+  // ボタンを押した時の処理
+  async function selectQuiz(id) {
+    quizDocId = id;
 
-    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドからデータをダウンロード中...</div>`;
+    // タイルのアクティブスタイルを切り替え
+    document.querySelectorAll(".quiz-tile-btn").forEach(el => el.classList.remove("active"));
+    const activeTile = document.getElementById(`tile_${id}`);
+    if(activeTile) activeTile.classList.add("active");
+
+    appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">⏳ クラウドから「${activeTile.querySelector('.quiz-tile-title').textContent}」を読み込んでいます...</div>`;
 
     try {
       const docSnap = await getDoc(doc(db, "quizzes", quizDocId));
       if(docSnap.exists()) {
         originalQuiz = docSnap.data();
-        // データの初期互換処理
         if(!originalQuiz.questions) originalQuiz.questions = [];
         originalQuiz.questions.forEach(q => {
           if (!q.stats) q.stats = { correct: 0, wrong: 0 };
@@ -472,6 +539,8 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           if (!q.unit) q.unit = q.status || "共通単元";
         });
         showStart();
+        // 設定画面へスムーズにスクロール
+        appArea.scrollIntoView({ behavior: 'smooth' });
       }
     } catch(err) {
       console.error(err);
@@ -479,7 +548,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     }
   }
 
-  // スタート画面（ダッシュボード）表示
   function showStart(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
@@ -487,7 +555,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     
     if(!originalQuiz) return;
 
-    // 単元ごとの統計を計算
     const stats = {};
     originalQuiz.questions.forEach(q => {
       const unitName = q.unit || "共通単元";
@@ -569,7 +636,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
     `;
 
-    // モード切り替えイベントバインド
     appArea.querySelectorAll("[data-mode]").forEach(el=>{
       el.onclick=()=>{
         appArea.querySelectorAll("[data-mode]").forEach(e=>e.classList.remove("active"));
@@ -577,7 +643,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       };
     });
 
-    // チェックボックス視覚連動バインド
     const cbs = appArea.querySelectorAll(".category-check");
     cbs.forEach(cb => {
       cb.onchange = () => {
@@ -586,7 +651,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       };
     });
 
-    // 全選択・全解除制御
     const checkAll = appArea.querySelector("#checkAll");
     checkAll.onchange = () => {
       cbs.forEach(cb => {
@@ -599,7 +663,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     appArea.querySelector("#startQuizBtn").onclick = startQuiz;
   }
 
-  // クイズ構築・開始
   function startQuiz(){
     score=0; streak=0; index=0; results=[]; misses=[];
     const mode = appArea.querySelector("[data-mode].active").dataset.mode;
@@ -617,14 +680,12 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     let baseQuestions = [];
     const normalStatuses = selectedStatuses.filter(s => s !== "miss");
     
-    // 選ばれた単元に属する問題を、元配列のインデックスを保持させつつ抽出
     originalQuiz.questions.forEach((q, originalIdx) => {
       if(normalStatuses.includes(q.unit)) {
         baseQuestions.push({ ...q, originalIdx: originalIdx });
       }
     });
 
-    // 苦手問題強制抽出ロジック
     if(selectedStatuses.includes("miss")){
       originalQuiz.questions.forEach((mq, originalIdx) => {
         const isAlreadyAdded = baseQuestions.some(bq => bq.originalIdx === originalIdx);
@@ -634,9 +695,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       });
     }
 
-    // 出題順並べ替え
     if(mode === "random"){
-      // シャッフル
       for(let i = baseQuestions.length - 1; i > 0; i--){
         const j = Math.floor(Math.random() * (i + 1));
         [baseQuestions[i], baseQuestions[j]] = [baseQuestions[j], baseQuestions[i]];
@@ -649,7 +708,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         const bCorrectRate = bHistory.length ? (bHistory.reduce((s,v)=>s+v,0)/bHistory.length) : 1;
         
         if(aCorrectRate !== bCorrectRate) return aCorrectRate - bCorrectRate;
-        return b.stats.wrong - a.stats.wrong; // 履歴が同じなら通算ミスが多い順
+        return b.stats.wrong - a.stats.wrong;
       });
     }
 
@@ -664,7 +723,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     showQuestion();
   }
 
-  // クイズ実行表示
   function showQuestion(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
@@ -701,7 +759,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     appArea.querySelector("#quitBtn").onclick = showResult;
   }
 
-  // 解答判定・エフェクト演出
   async function checkAnswer(){
     const input = appArea.querySelector("#answerInput");
     if(!input) return;
@@ -712,9 +769,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     saveGlobalCount();
 
     const q = quiz.questions[index];
-    // 元データ（originalQuiz）への正確な参照を確保
     const original = originalQuiz.questions[q.originalIdx];
-
     const correct = normalize(user) === normalize(q.answer);
 
     if(correct){
@@ -726,7 +781,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     results.push({ question: q.question, user: user, answer: q.answer, correct });
     
-    // 解答ごとにクラウドへ進捗をサイレントセーブ
     try {
       await setDoc(doc(db, "quizzes", quizDocId), originalQuiz);
     } catch(e) {
@@ -744,7 +798,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     setTimeout(() => { showJudge(correct, q.answer); }, 600);
   }
 
-  // 判定表示画面
   function showJudge(correct, answer){
     appArea.innerHTML = `
       <div class="card" style="text-align:center;">
@@ -782,7 +835,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     index++; showQuestion();
   }
 
-  // 結果（リザルト）画面
   function showResult(){
     clearTimeout(nextTimer);
     window.removeEventListener("keydown", handleEnterNext);
@@ -826,20 +878,17 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     appArea.querySelector("#backToMenuBtn").onclick = showStart;
   }
 
-  // 間違えた問題だけで再シャッフル・再挑戦
   function retryMisses(){
     if(misses.length === 0){ 
       openModal("🎉 パーフェクト！", "ミスした問題はありません。"); 
       return; 
     }
-    // originalIdxを保持したままキューを再構成
     quiz = { questions: [...misses] };
     index=0; score=0; results=[]; misses=[];
     document.getElementById("quizSelectCard").style.display = "none";
     showQuestion();
   }
 
-  // ユーティリティ群
   function normalize(str){
     return str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, "").trim().toLowerCase();
   }
@@ -851,6 +900,10 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   }
   function hideModal() { 
     document.getElementById("customModal").classList.remove("active"); 
+  }
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 </script>
 </body>
