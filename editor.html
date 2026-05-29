@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>問題集制作エディタ</title>
+
+<style>
+:root{
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --text:#1e293b;
+  --sub:#64748b;
+  --primary:#4f46e5;
+  --primary2:#4338ca;
+  --good:#16a34a;
+  --bad:#dc2626;
+  --border:#dbe4ff;
+  --bar-bg:#e2e8f0;
+  --edit-bg:#fff8e6;
+  --edit-border:orange;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f172a;
+    --card:#111827;
+    --text:#f8fafc;
+    --sub:#94a3b8;
+    --border:#334155;
+    --bar-bg:#334155;
+    --edit-bg:#2c2001;
+    --edit-border:#b45309;
+  }
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  padding:20px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.container{
+  max-width:800px;
+  margin:auto;
+}
+
+h1{
+  text-align:center;
+  font-size:32px;
+  margin-bottom:24px;
+}
+
+h2{
+  font-size:20px;
+  margin-top:0;
+  margin-bottom:16px;
+  font-weight:bold;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:24px;
+  padding:24px;
+  margin-bottom:18px;
+  box-shadow:0 10px 28px rgba(0,0,0,.08);
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: var(--sub);
+}
+
+input[type="text"], textarea {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  font-size: 16px;
+  background: var(--card);
+  color: var(--text);
+  margin-bottom: 16px;
+  font-family: inherit;
+}
+
+input[type="text"]:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* ファイルエリア */
+.file-area {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  border: 2px dashed var(--primary);
+  background: rgba(99,102,241,0.03);
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+input[type="file"] { display: none; }
+
+button{
+  border:none;
+  border-radius:12px;
+  padding:12px 20px;
+  font-size:16px;
+  cursor:pointer;
+  transition: opacity 0.2s;
+  font-weight: bold;
+}
+
+button:hover { opacity: 0.9; }
+
+.primary{
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:white;
+}
+
+.success{
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  color:white;
+}
+
+.danger{
+  background:#dc2626;
+  color:white;
+}
+
+.gray{
+  background:transparent;
+  border:2px solid var(--sub);
+  color:var(--sub);
+}
+
+.button-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.question-item{
+  border:1px solid var(--border);
+  background: rgba(99,102,241,0.02);
+  padding:16px;
+  border-radius:16px;
+  margin-top:12px;
+  position: relative;
+}
+
+.question-item.editing{
+  border:2px solid var(--edit-border);
+  background:var(--edit-bg);
+}
+
+.q-meta {
+  font-size: 13px;
+  color: var(--sub);
+  margin-bottom: 6px;
+}
+
+.q-text {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.q-ans {
+  font-size: 15px;
+  color: var(--good);
+  font-weight: bold;
+}
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.item-actions button {
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+@media(max-width:640px){
+  body{ padding: 10px; }
+  .card{ padding: 16px; }
+  button { width: 100%; }
+  .item-actions button { width: auto; flex: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>問題集制作エディタ</h1>
+
+<div class="card">
+  <h2>ファイル管理・基本設定</h2>
+  
+  <label class="file-area" for="fileInput">
+    📂 既存のJSONファイルを読み込んで再編集
+  </label>
+  <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
+
+  <label for="quizTitle">問題集のタイトル</label>
+  <input type="text" id="quizTitle" placeholder="例: 国家試験対策・重要英単語">
+  
+  <div class="button-row">
+    <button class="success" onclick="saveFile()">💾 JSONファイルとして保存・ダウンロード</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2 id="formTitle">問題の新規作成</h2>
+  
+  <label for="unitInput">単元名・カテゴリ（暗記システムで自動分類されます）</label>
+  <input type="text" id="unitInput" placeholder="例: 第1章 基礎知識 / 果物シリーズ / 日本史・江戸時代">
+
+  <label for="questionInput">問題文</label>
+  <textarea id="questionInput" rows="3" placeholder="ここに問題にする文章を入力してください"></textarea>
+  
+  <label for="answerInput">正解の単語（解答ページで完全一致判定される文字列）</label>
+  <input type="text" id="answerInput" placeholder="ここに答えを入力してください">
+
+  <div class="button-row">
+    <button id="mainBtn" class="primary" onclick="handleMain()">問題を追加</button>
+    <button id="cancelBtn" class="gray" style="display:none;" onclick="cancelEdit()">キャンセル</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>問題一覧 (<span id="qCount">0</span>問)</h2>
+  <div id="list"></div>
+</div>
+
+</div>
+
+<script>
+let questions=[];
+let editIndex=null;
+
+function handleMain(){
+  if(editIndex===null){
+    addQuestion();
+  }else{
+    updateQuestion();
+  }
+}
+
+function addQuestion(){
+  const q = document.getElementById("questionInput").value.trim();
+  const a = document.getElementById("answerInput").value.trim();
+  const u = document.getElementById("unitInput").value.trim() || "共通単元";
+  
+  if(!q || !a){ 
+    alert("問題文と正解は必ず入力してください"); 
+    return; 
+  }
+
+  // 暗記ページのオブジェクト構造（stats等の初期値）を担保してプッシュ
+  questions.push({
+    question: q,
+    answer: a,
+    unit: u,
+    stats: { correct: 0, wrong: 0 },
+    statsHistory: []
+  });
+  
+  render();
+  clearForm();
+}
+
+function editQuestion(i){
+  editIndex=i;
+  document.getElementById("formTitle").textContent = "⚙️ 問題の編集（変更中）";
+  document.getElementById("questionInput").value = questions[i].question;
+  document.getElementById("answerInput").value = questions[i].answer;
+  document.getElementById("unitInput").value = questions[i].unit || "";
+  
+  document.getElementById("mainBtn").textContent = "変更を確定する";
+  document.getElementById("cancelBtn").style.display = "inline-block";
+  render();
+  document.getElementById("formTitle").scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateQuestion(){
+  const q = document.getElementById("questionInput").value.trim();
+  const a = document.getElementById("answerInput").value.trim();
+  const u = document.getElementById("unitInput").value.trim() || "共通単元";
+  
+  if(!q || !a){ 
+    alert("問題文と正解は必ず入力してください"); 
+    return; 
+  }
+
+  // 既存データ（過去の正答数など）を引き継ぎつつ上書き
+  questions[editIndex].question = q;
+  questions[editIndex].answer = a;
+  questions[editIndex].unit = u;
+
+  editIndex=null;
+  document.getElementById("formTitle").textContent = "問題の新規作成";
+  document.getElementById("mainBtn").textContent = "問題を追加";
+  document.getElementById("cancelBtn").style.display = "none";
+  render();
+  clearForm();
+}
+
+function cancelEdit(){
+  editIndex=null;
+  document.getElementById("formTitle").textContent = "問題の新規作成";
+  document.getElementById("mainBtn").textContent = "問題を追加";
+  document.getElementById("cancelBtn").style.display = "none";
+  clearForm();
+  render();
+}
+
+function deleteQuestion(i){
+  if(confirm("この問題を削除してもよろしいですか？")){
+    questions.splice(i,1);
+    if(editIndex === i) {
+      cancelEdit();
+    } else if(editIndex > i) {
+      editIndex--;
+    }
+    render();
+  }
+}
+
+function render(){
+  const list = document.getElementById("list");
+  list.innerHTML="";
+  document.getElementById("qCount").textContent = questions.length;
+
+  if(questions.length === 0) {
+    list.innerHTML = `<div style="text-align:center; color:var(--sub); padding:20px;">問題がありません。上のフォームから追加してください。</div>`;
+    return;
+  }
+
+  questions.forEach((q,i)=>{
+    const div=document.createElement("div");
+    div.className="question-item";
+    if(i===editIndex) div.classList.add("editing");
+
+    div.innerHTML=`
+      <div class="q-meta">#${i+1} 【単元: ${q.unit || '共通単元'}】</div>
+      <div class="q-text">${escapeHtml(q.question)}</div>
+      <div class="q-ans">正解: ${escapeHtml(q.answer)}</div>
+      <div class="item-actions">
+        <button class="primary" onclick="editQuestion(${i})">編集</button>
+        <button class="danger" onclick="deleteQuestion(${i})">削除</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function clearForm(){
+  document.getElementById("questionInput").value="";
+  document.getElementById("answerInput").value="";
+  // 単元名は連続して作りやすいように、あえてクリアせず残します
+}
+
+function saveFile(){
+  const title = document.getElementById("quizTitle").value.trim();
+  if(!title){ 
+    alert("問題集のタイトルを入力してください"); 
+    return; 
+  }
+
+  const data={
+    title: title,
+    questions: questions
+  };
+
+  const blob=new Blob(
+    [JSON.stringify(data, null, 2)],
+    {type:"application/json"}
+  );
+
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download = `${title}.json`;
+  a.click();
+}
+
+function loadFile(e){
+  const file=e.target.files[0];
+  if(!file) return;
+
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=JSON.parse(ev.target.result);
+
+      document.getElementById("quizTitle").value = data.title || "";
+      // もし読み込んだデータに単元（unit）がなく旧型（status等）だった場合の互換処理
+      questions = data.questions || [];
+      questions.forEach(q => {
+        if(!q.unit) q.unit = q.status || "共通単元";
+        if(!q.stats) q.stats = { correct: 0, wrong: 0 };
+        if(!q.statsHistory) q.statsHistory = [];
+      });
+
+      editIndex=null;
+      document.getElementById("formTitle").textContent = "問題の新規作成";
+      document.getElementById("cancelBtn").style.display="none";
+      document.getElementById("mainBtn").textContent="問題を追加";
+      render();
+
+    }catch{
+      alert("ファイルの解析に失敗しました。正しい暗記用JSONファイルか確認してください。");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ""; // 同じファイルを再度読み込めるようにリセット
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+}
+</script>
+
+</body>
+</html>
