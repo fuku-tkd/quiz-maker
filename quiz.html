@@ -659,8 +659,15 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         subjectGroups[subject].push({ id: doc.id, ...data });
       });
 
-      // 教科ごとにDOMを構築
-      Object.keys(subjectGroups).forEach((subName) => {
+      // --- 【追加・修正ロジック】教科名を50音順ソート（「その他」は強制的に一番下） ---
+      const sortedSubjectNames = Object.keys(subjectGroups).sort((a, b) => {
+        if (a === "その他") return 1;   // aがその他なら後ろへ
+        if (b === "その他") return -1;  // bがその他なら前へ
+        return a.localeCompare(b, 'ja'); // 通常の50音順比較
+      });
+
+      // ソートされた教科順にDOMを構築
+      sortedSubjectNames.forEach((subName) => {
         const quizList = subjectGroups[subName];
         
         const groupEl = document.createElement("div");
@@ -1351,7 +1358,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           <button class="main-btn" id="retryBtn">間違えた問題だけ再挑戦</button>
           <button class="sub-btn" id="backToMenuBtn">最初に戻る</button>
         </div>
-        <h2 style="margin-top:24px;">今回の解答履歴</h2>
+        h2 style="margin-top:24px;">今回の解答履歴</h2>
         ${detail}
       </div>
     `;
