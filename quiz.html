@@ -18,7 +18,6 @@
   --border:#dbe4ff;
   --bar-bg:#e2e8f0;
   
-  /* 暗記モード用カラー */
   --rank1:#f59e0b;
   --rank2:#84cc16;
   --rank3:#22c55e;
@@ -75,7 +74,6 @@ h2{
   position: relative;
 }
 
-/* 大枠の開閉 */
 .quiz-select-header {
   display: flex;
   align-items: center;
@@ -95,13 +93,13 @@ h2{
   margin-top: 0;
 }
 
-/* --- 教科ごとのアコーディオン構造 --- */
 .subject-group {
   border: 1px solid var(--border);
   border-radius: 18px;
   margin-bottom: 12px;
   overflow: hidden;
   background: var(--card);
+  transition: border-color 0.2s, background-color 0.2s;
 }
 
 .subject-header {
@@ -143,12 +141,11 @@ h2{
   padding: 0;
 }
 .subject-group.open .subject-items-container {
-  max-height: 1000px; /* 展開時の最大高さ */
+  max-height: 1000px;
   padding: 12px;
   border-top: 1px solid var(--border);
 }
 
-/* 教科内の各問題集行 */
 .quiz-row-item {
   background: var(--card);
   border: 2px solid var(--border);
@@ -214,7 +211,6 @@ h2{
   display: inline-block;
 }
 
-/* 共通トグルボタン */
 .toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -599,7 +595,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // グローバル状態管理
   let originalQuiz = null;   
   let quizDocId = null;      
   let quiz = null;           
@@ -610,7 +605,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   let misses = [];
   let nextTimer = null;
 
-  // 暗記モード用管理状態
   let isMemorizeMode = false; 
   let sessionAnsweredCount = 0; 
   let memorizeSuccessLogs = {}; 
@@ -627,14 +621,24 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const isCollapsed = quizSelectCard.classList.contains("collapsed");
     if (isCollapsed) {
       quizSelectCard.classList.remove("collapsed");
-      mainQuizToggleBtn.textContent = "∨"; // 展開時は下向き
+      mainQuizToggleBtn.textContent = "∨";
     } else {
       quizSelectCard.classList.add("collapsed");
-      mainQuizToggleBtn.textContent = "^"; // 収納（折りたたみ）時は上向き
+      mainQuizToggleBtn.textContent = "^";
     }
   };
 
   window.addEventListener("DOMContentLoaded", fetchQuizList);
+
+  // HEXカラー(#ffffff)を、透過度を指定したrgba形式へマージする便利関数
+  function hexToRgba(hex, alpha) {
+    if (!hex || !hex.startsWith('#')) return null;
+    const c = hex.substring(1);
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   async function fetchQuizList() {
     try {
@@ -646,7 +650,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         return;
       }
 
-      // 教科ごとに問題集データをグループ化
       const subjectGroups = {};
 
       querySnapshot.forEach((doc) => {
@@ -654,34 +657,49 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         const subject = data.subject || "その他";
         
         if (!subjectGroups[subject]) {
-          subjectGroups[subject] = [];
+          subjectGroups[subject] = {
+            color: data.subjectColor || null, // 各問題集からカラーを取得
+            quizzes: []
+          };
         }
-        subjectGroups[subject].push({ id: doc.id, ...data });
+        // もしカラーが未設定のドキュメントがあれば、設定されているドキュメントのカラーを優先
+        if (data.subjectColor && !subjectGroups[subject].color) {
+          subjectGroups[subject].color = data.subjectColor;
+        }
+        subjectGroups[subject].quizzes.push({ id: doc.id, ...data });
       });
 
-      // --- 【追加・修正ロジック】教科名を50音順ソート（「その他」は強制的に一番下） ---
       const sortedSubjectNames = Object.keys(subjectGroups).sort((a, b) => {
-        if (a === "その他") return 1;   // aがその他なら後ろへ
-        if (b === "その他") return -1;  // bがその他なら前へ
-        return a.localeCompare(b, 'ja'); // 通常の50音順比較
+        if (a === "その他") return 1;
+        if (b === "other") return -1;
+        return a.localeCompare(b, 'ja');
       });
 
-      // ソートされた教科順にDOMを構築
       sortedSubjectNames.forEach((subName) => {
-        const quizList = subjectGroups[subName];
-        
+        const groupData = subjectGroups[subName];
+        const quizList = groupData.quizzes;
+        const baseColor = groupData.color; // 例: "#4f46e5"
+
         const groupEl = document.createElement("div");
         groupEl.className = "subject-group";
         groupEl.id = `group_${subName}`;
 
-        // 初期は閉じているので「^」
+        // カラー設定があれば、今のUI風に馴染むように薄めて適用
+        if (baseColor) {
+          const bgSoft = hexToRgba(baseColor, 0.03);     // 背景はほんのり3%
+          const borderSoft = hexToRgba(baseColor, 0.25); // 枠線は25%
+          
+          groupEl.style.borderColor = borderSoft;
+          groupEl.style.backgroundColor = bgSoft;
+        }
+
         groupEl.innerHTML = `
-          <div class="subject-header">
+          <div class="subject-header" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.05)}"` : ''}>
             <div class="subject-title-left">
-              <span>${escapeHtml(subName)}</span>
-              <span class="subject-count-tag">${quizList.length}個の問題集</span>
+              <span ${baseColor ? `style="color: ${baseColor}"` : ''}>${escapeHtml(subName)}</span>
+              <span class="subject-count-tag" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.15)}; color: ${baseColor};"` : ''}>${quizList.length}個の問題集</span>
             </div>
-            <button class="toggle-btn sub-toggle-btn">^</button>
+            <button class="toggle-btn sub-toggle-btn" ${baseColor ? `style="border-color: ${hexToRgba(baseColor, 0.3)}; color: ${baseColor};"` : ''}>^</button>
           </div>
           <div class="subject-items-container"></div>
         `;
@@ -689,19 +707,21 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         const itemsContainer = groupEl.querySelector(".subject-items-container");
         const subToggleBtn = groupEl.querySelector(".sub-toggle-btn");
 
-        // 教科ヘッダーをクリックしたら開閉
-        groupEl.querySelector(".subject-header").onclick = (e) => {
+        if(baseColor) {
+          itemsContainer.style.borderTopColor = hexToRgba(baseColor, 0.2);
+        }
+
+        groupEl.querySelector(".subject-header").onclick = () => {
           const isOpen = groupEl.classList.contains("open");
           if (isOpen) {
             groupEl.classList.remove("open");
-            subToggleBtn.textContent = "^"; // 閉じている時は上向き
+            subToggleBtn.textContent = "^";
           } else {
             groupEl.classList.add("open");
-            subToggleBtn.textContent = "∨"; // 展開している時は下向き
+            subToggleBtn.textContent = "∨";
           }
         };
 
-        // 教科内の各問題集を追加
         quizList.forEach((quizData) => {
           const questions = quizData.questions || [];
           const logs = quizData.logs || {};
@@ -728,10 +748,20 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           const rowItem = document.createElement("div");
           rowItem.className = "quiz-row-item";
           rowItem.id = `row_${quizData.id}`;
+          
+          if(baseColor) {
+            rowItem.style.borderColor = hexToRgba(baseColor, 0.15);
+          }
+
           if (quizDocId === quizData.id) {
             rowItem.classList.add("active");
-            groupEl.classList.add("open"); // 選択中の問題集がある教科は最初から開く
+            groupEl.classList.add("open");
             subToggleBtn.textContent = "∨";
+            
+            if(baseColor) {
+              rowItem.style.borderColor = baseColor;
+              rowItem.style.backgroundColor = hexToRgba(baseColor, 0.05);
+            }
           }
 
           rowItem.innerHTML = `
@@ -739,7 +769,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
               <div class="quiz-row-left">
                 <div class="quiz-row-title-container">
                   <span class="quiz-row-title">${escapeHtml(title)}</span>
-                  <span class="select-status-badge">選択中</span>
+                  <span class="select-status-badge" ${baseColor ? `style="background: ${baseColor}"` : ''}>選択中</span>
                 </div>
                 <div class="quiz-row-meta">
                   収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
@@ -749,7 +779,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           `;
 
           rowItem.onclick = (e) => {
-            e.stopPropagation(); // 教科ヘッダーの開閉イベントを防止
+            e.stopPropagation();
             selectQuiz(quizData.id);
             quizSelectCard.classList.add("collapsed");
             mainQuizToggleBtn.textContent = "^";
@@ -769,11 +799,17 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   async function selectQuiz(id) {
     quizDocId = id;
-    document.querySelectorAll(".quiz-row-item").forEach(el => el.classList.remove("active"));
-    const activeRow = document.getElementById(`row_${id}`);
-    if(activeRow) activeRow.classList.add("active");
+    document.querySelectorAll(".quiz-row-item").forEach(el => {
+      el.classList.remove("active");
+      el.style.backgroundColor = "";
+      el.style.borderColor = "";
+    });
+    
+    // リスト再構築を呼んでカラー反映状態をカチッと合わせる
+    await fetchQuizList();
 
-    const titleText = activeRow.querySelector('.quiz-row-title').textContent;
+    const activeRow = document.getElementById(`row_${id}`);
+    const titleText = activeRow ? activeRow.querySelector('.quiz-row-title').textContent : "問題集";
     appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">クラウドから「${titleText}」を読み込んでいます...</div>`;
 
     try {
@@ -806,6 +842,9 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     
     if(!originalQuiz) return;
 
+    // 現在選択されている教科のベースカラー
+    const baseColor = originalQuiz.subjectColor || null;
+
     const stats = {};
     originalQuiz.questions.forEach(q => {
       const unitName = q.unit || "共通単元";
@@ -821,16 +860,24 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       const s = stats[cat] || { correct: 0, total: 0 };
       const rate = s.total === 0 ? 0 : Math.round((s.correct / s.total) * 100);
       
+      // 単元カードの背景・枠線も教科カラーに馴染ませる
+      let customLabelStyle = "";
+      let customBarStyle = "";
+      if (baseColor) {
+        customLabelStyle = `style="background: ${hexToRgba(baseColor, 0.02)}; border-color: ${hexToRgba(baseColor, 0.15)}"`;
+        customBarStyle = `style="background: linear-gradient(90deg, ${baseColor}, ${hexToRgba(baseColor, 0.8)})"`;
+      }
+
       unitListHTML += `
-        <label class="unit-row-label" id="label_${cat}">
-          <input type="checkbox" class="category-check" value="${cat}" checked>
+        <label class="unit-row-label" id="label_${cat}" ${customLabelStyle}>
+          <input type="checkbox" class="category-check" value="${cat}" checked ${baseColor ? `style="accent-color:${baseColor}"`:''}>
           <div class="unit-info">
             <div class="unit-header-meta">
               <span>${cat}</span>
               <span class="unit-rate">正答率: ${rate}%</span>
             </div>
             <div class="bar-container">
-              <div class="bar" style="width:${rate}%"></div>
+              <div class="bar" ${customBarStyle || `style="width:${rate}%"`} ${baseColor ? `data-rate="${rate}"` : `style="width:${rate}%"`}></div>
             </div>
           </div>
         </label>
@@ -852,7 +899,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         <h2>カテゴリ・単元選択</h2>
         <div class="unit-list">
           <label class="unit-row-label" style="background:transparent; border:none; padding:4px 0;">
-            <input type="checkbox" id="checkAll" checked>
+            <input type="checkbox" id="checkAll" checked ${baseColor ? `style="accent-color:${baseColor}"`:''}>
             <div class="unit-info" style="font-weight:bold;">すべて選択 / 解除</div>
           </label>
           <hr style="width:100%; border:0; border-top:1px dashed var(--border); margin:4px 0;">
@@ -860,7 +907,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           <div id="dynamicUnitContainer">${unitListHTML}</div>
           
           <label class="unit-row-label" id="label_miss" style="border: 1px dashed var(--bad); background: rgba(220,38,38,0.02);">
-            <input type="checkbox" class="category-check" value="miss">
+            <input type="checkbox" class="category-check" value="miss" style="accent-color: var(--bad)">
             <div class="unit-info" style="color: var(--bad); font-weight: bold;">
               通算ミス（不正解数）が正解より多い問題のみを強制抽出
             </div>
@@ -874,15 +921,32 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
 
       <div class="button-row center">
-        <button class="main-btn" id="startQuizBtn" style="width: 100%; max-width: 300px;">スタート</button>
+        <button class="main-btn" id="startQuizBtn" style="width: 100%; max-width: 300px; ${baseColor ? `background:linear-gradient(135deg, ${baseColor}, ${hexToRgba(baseColor,0.8)})` : ''}">スタート</button>
       </div>
     `;
 
+    // 読み込み後にカスタムバーの幅を固定処理
+    appArea.querySelectorAll(".bar[data-rate]").forEach(bar => {
+      bar.style.width = bar.dataset.rate + "%";
+    });
+
+    // モード選択ボタンのカラーフック
     appArea.querySelectorAll("[data-mode]").forEach(el=>{
+      if (baseColor && el.classList.contains("active")) {
+        el.style.background = baseColor;
+        el.style.color = "#fff";
+      }
       el.onclick=()=>{
-        appArea.querySelectorAll("[data-mode]").forEach(e=>e.classList.remove("active"));
+        appArea.querySelectorAll("[data-mode]").forEach(e=>{
+          e.classList.remove("active");
+          e.style.background = "";
+          e.style.color = "";
+        });
         el.classList.add("active");
-        
+        if (baseColor) {
+          el.style.background = baseColor;
+          el.style.color = "#fff";
+        }
         if(el.dataset.mode === "memorize") {
           document.getElementById("maxCountContainer").style.display = "none";
         } else {
@@ -988,6 +1052,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     window.removeEventListener("keydown", handleEnterNext);
     quizSelectCard.style.display = "none";
 
+    const baseColor = originalQuiz.subjectColor || null;
     const activePool = quiz.questions.filter(q => memorizeSuccessLogs[q.originalIdx] < 3);
 
     if(activePool.length === 0) {
@@ -1015,8 +1080,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(currentSuccess === 1) rankBadge = `<span class="badge" style="background:var(--rank1); color:white;">1回正解</span>`;
     if(currentSuccess === 2) rankBadge = `<span class="badge" style="background:var(--rank2); color:white;">2回正解</span>`;
 
+    // プレイ中画面のメインカード枠線も、設定色があれば馴染ませる
+    let cardCustomStyle = "";
+    if(baseColor) {
+      cardCustomStyle = `style="border-color: ${hexToRgba(baseColor, 0.3)}; background-color: ${hexToRgba(baseColor, 0.01)}"`;
+    }
+
     appArea.innerHTML = `
-      <div class="card" id="quizCard">
+      <div class="card" id="quizCard" ${cardCustomStyle}>
         <div class="effect-overlay" id="effectOverlay"></div>
         <div class="topbar">
           <div>暗記モード</div>
@@ -1024,9 +1095,9 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         </div>
         <div style="font-size:14px; color:var(--sub); margin-top:10px;">単元: ${currentMemorizeQuestion.unit} (残りカウント対象: ${activePool.length}問)</div>
         <div class="question">${currentMemorizeQuestion.question}</div>
-        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力">
+        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力" ${baseColor ? `style="border-color:${hexToRgba(baseColor, 0.3)}"`:''}>
         <div class="button-row">
-          <button class="main-btn" id="judgeBtn">判定する</button>
+          <button class="main-btn" id="judgeBtn" ${baseColor ? `style="background: ${baseColor}"`:''}>判定する</button>
           <button class="danger-sub-btn" id="quitBtn">暗記セッションを終了</button>
         </div>
       </div>
@@ -1036,6 +1107,10 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(input) {
       setTimeout(()=>{ input.focus(); }, 20);
       input.addEventListener("keydown", e => { if(e.key === "Enter"){ checkMemorizeAnswer(); } });
+      if(baseColor) {
+        input.onfocus = () => input.style.borderColor = baseColor;
+        input.onblur = () => input.style.borderColor = hexToRgba(baseColor, 0.3);
+      }
     }
     appArea.querySelector("#judgeBtn").onclick = checkMemorizeAnswer;
     appArea.querySelector("#quitBtn").onclick = showStart;
@@ -1089,6 +1164,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   }
 
   function showMemorizeJudge(correct, answer) {
+    const baseColor = originalQuiz.subjectColor || null;
     appArea.innerHTML = `
       <div class="card" style="text-align:center;">
         <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解':'不正解'}</h2>
@@ -1101,7 +1177,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         </div>
 
         <div class="button-row" style="justify-content:center;">
-          <button class="main-btn" id="nextBtn">次へ (Enter)</button>
+          <button class="main-btn" id="nextBtn" ${baseColor ? `style="background: ${baseColor}"`:''}>次へ (Enter)</button>
         </div>
       </div>
     `;
@@ -1130,6 +1206,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   function showMemorizeProgressGraph() {
     window.removeEventListener("keydown", handleEnterNext);
+    const baseColor = originalQuiz.subjectColor || null;
     
     let r0 = 0, r1 = 0, r2 = 0, r3 = 0;
     const totalQuestions = quiz.questions.length;
@@ -1149,7 +1226,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     appArea.innerHTML = `
       <div class="card" style="text-align: center;">
-        <h2 style="color: var(--primary); font-size:22px; margin-bottom:10px;">現在の暗記定着度（5問達成）</h2>
+        <h2 style="color: var(--primary); font-size:22px; margin-bottom:10px; ${baseColor ? `color:${baseColor}`:''}">現在の暗記定着度（5問達成）</h2>
         <p style="font-size:14px; color:var(--sub);">全 ${totalQuestions} 問の現在の正解回数割合です</p>
         
         <div class="stacked-bar-container">
@@ -1167,7 +1244,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         </div>
 
         <div class="button-row center" style="margin-top:28px;">
-          <button class="main-btn" id="continueMemorizeBtn" style="width:100%; max-width:280px;">暗記を続ける (Enter)</button>
+          <button class="main-btn" id="continueMemorizeBtn" style="width:100%; max-width:280px; ${baseColor ? `background: ${baseColor}`:''}">暗記を続ける (Enter)</button>
         </div>
       </div>
     `;
@@ -1216,20 +1293,26 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
     const q = quiz.questions[index];
     const progress = Math.round((index / quiz.questions.length) * 100);
+    const baseColor = originalQuiz.subjectColor || null;
+
+    let cardCustomStyle = "";
+    if(baseColor) {
+      cardCustomStyle = `style="border-color: ${hexToRgba(baseColor, 0.3)}; background-color: ${hexToRgba(baseColor, 0.01)}"`;
+    }
 
     appArea.innerHTML = `
-      <div class="card" id="quizCard">
+      <div class="card" id="quizCard" ${cardCustomStyle}>
         <div class="effect-overlay" id="effectOverlay"></div>
         <div class="topbar">
-          <div class="badge">現在の連続正解: ${streak}</div>
+          <div class="badge" ${baseColor ? `style="background:${hexToRgba(baseColor, 0.15)}; color:${baseColor}"`:''}>現在の連続正解: ${streak}</div>
         </div>
-        <div class="progress"><div class="progress-inner" style="width:${progress}%"></div></div>
+        <div class="progress"><div class="progress-inner" style="width:${progress}%; ${baseColor ? `background:${baseColor}`:''}"></div></div>
         <div style="font-size:14px; color:var(--sub); margin-bottom:4px;">単元: ${q.unit}</div>
         <div>第 ${index+1} 問 / ${quiz.questions.length}</div>
         <div class="question">${q.question}</div>
-        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力">
+        <input id="answerInput" autocomplete="off" type="text" placeholder="解答を入力" ${baseColor ? `style="border-color:${hexToRgba(baseColor, 0.3)}"`:''}>
         <div class="button-row">
-          <button class="main-btn" id="judgeBtn">判定する</button>
+          <button class="main-btn" id="judgeBtn" ${baseColor ? `style="background: ${baseColor}"`:''}>判定する</button>
           <button class="danger-sub-btn" id="quitBtn">中断して結果へ</button>
         </div>
       </div>
@@ -1239,6 +1322,10 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(input) {
       setTimeout(()=>{ input.focus(); }, 20);
       input.addEventListener("keydown", e => { if(e.key === "Enter"){ checkAnswer(); } });
+      if(baseColor) {
+        input.onfocus = () => input.style.borderColor = baseColor;
+        input.onblur = () => input.style.borderColor = hexToRgba(baseColor, 0.3);
+      }
     }
     appArea.querySelector("#judgeBtn").onclick = checkAnswer;
     appArea.querySelector("#quitBtn").onclick = showResult;
@@ -1288,13 +1375,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   }
 
   function showJudge(correct, answer){
+    const baseColor = originalQuiz.subjectColor || null;
     appArea.innerHTML = `
       <div class="card" style="text-align:center;">
         <h2 class="${correct ? 'good':'bad'}" style="font-size: 40px; margin: 10px 0;">${correct ? '正解':'不正解'}</h2>
         ${!correct ? `<div style="font-size:34px; margin-bottom:15px; font-weight:bold;">正解：<span class="good">${answer}</span></div>` : ''}
         ${correct ? `<div style="color:var(--sub); margin-bottom:10px; font-size:16px;">1秒後に次の問題に進みます</div>` : ''}
         <div class="button-row" style="justify-content:center;">
-          <button class="main-btn" id="nextBtn">次へ (Enter)</button>
+          <button class="main-btn" id="nextBtn" ${baseColor ? `style="background: ${baseColor}"`:''}>次へ (Enter)</button>
           <button class="danger-sub-btn" id="exitBtn">終了</button>
         </div>
       </div>
@@ -1335,6 +1423,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const total = results.length;
     if(total === 0) { showStart(); return; }
     const rate = Math.round((score / total) * 100);
+    const baseColor = originalQuiz.subjectColor || null;
 
     let detail = "";
     results.forEach((r, i)=>{
@@ -1350,15 +1439,15 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       <div class="card">
         <h2>テスト結果</h2>
         <div class="stats">
-          <div class="stat"><div>最終スコア</div><div class="stat-value">${score} / ${total}</div></div>
-          <div class="stat"><div>今回の正答率</div><div class="stat-value">${rate}%</div></div>
+          <div class="stat" ${baseColor ? `style="background:${hexToRgba(baseColor,0.06)}"`:''}><div>最終スコア</div><div class="stat-value">${score} / ${total}</div></div>
+          <div class="stat" ${baseColor ? `style="background:${hexToRgba(baseColor,0.06)}"`:''}><div>今回の正答率</div><div class="stat-value">${rate}%</div></div>
         </div>
-        <div class="progress"><div class="progress-inner" style="width:${rate}%"></div></div>
+        <div class="progress"><div class="progress-inner" style="width:${rate}%; ${baseColor ? `background:${baseColor}`:''}"></div></div>
         <div class="button-row">
-          <button class="main-btn" id="retryBtn">間違えた問題だけ再挑戦</button>
-          <button class="sub-btn" id="backToMenuBtn">最初に戻る</button>
+          <button class="main-btn" id="retryBtn" ${baseColor ? `style="background: ${baseColor}"`:''}>間違えた問題だけ再挑戦</button>
+          <button class="sub-btn" id="backToMenuBtn" ${baseColor ? `style="border-color: ${baseColor}; color:${baseColor}"`:''}>最初に戻る</button>
         </div>
-        h2 style="margin-top:24px;">今回の解答履歴</h2>
+        <h2 style="margin-top:24px;">今回の解答履歴</h2>
         ${detail}
       </div>
     `;
