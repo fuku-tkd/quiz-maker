@@ -75,6 +75,7 @@ h2{
   position: relative;
 }
 
+/* 大枠の開閉 */
 .quiz-select-header {
   display: flex;
   align-items: center;
@@ -84,7 +85,7 @@ h2{
 }
 
 .quiz-select-body {
-  max-height: 1000px;
+  max-height: 2000px;
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
   margin-top: 16px;
@@ -94,16 +95,64 @@ h2{
   margin-top: 0;
 }
 
-.quiz-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* --- 教科ごとのアコーディオン構造 --- */
+.subject-group {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--card);
 }
 
+.subject-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(99,102,241,0.02);
+  cursor: pointer;
+  user-select: none;
+  font-weight: bold;
+  font-size: 16px;
+}
+.subject-header:hover {
+  background: rgba(99,102,241,0.06);
+}
+
+.subject-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subject-count-tag {
+  font-size: 12px;
+  background: var(--border);
+  color: var(--primary2);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.subject-items-container {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+.subject-group.open .subject-items-container {
+  max-height: 1000px; /* 展開時の最大高さ */
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* 教科内の各問題集行 */
 .quiz-row-item {
   background: var(--card);
   border: 2px solid var(--border);
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
   transition: all 0.2s ease;
 }
@@ -117,7 +166,7 @@ h2{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  padding: 14px 16px;
   cursor: pointer;
   user-select: none;
 }
@@ -129,7 +178,7 @@ h2{
 .quiz-row-left {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex-grow: 1;
 }
 
@@ -141,40 +190,23 @@ h2{
 }
 
 .quiz-row-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
   color: var(--text);
   word-break: break-all;
 }
 
-/* 教科バッジスタイル */
-.subject-badge {
-  background: #f1f5f9;
-  color: #475569;
-  font-size: 12px;
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-}
-@media (prefers-color-scheme: dark){
-  .subject-badge {
-    background: #334155;
-    color: #cbd5e1;
-  }
-}
-
 .quiz-row-meta {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--sub);
 }
 
 .select-status-badge {
   background: var(--primary);
   color: white;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 999px;
   display: none;
 }
@@ -182,18 +214,19 @@ h2{
   display: inline-block;
 }
 
+/* 共通トグルボタン */
 .toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--sub);
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   transition: all 0.2s;
 }
@@ -613,59 +646,114 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         return;
       }
 
+      // 教科ごとに問題集データをグループ化
+      const subjectGroups = {};
+
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        const questions = data.questions || [];
-        const logs = data.logs || {}; 
-        const qCount = questions.length;
-        const title = data.title || "無題の問題集";
-        const subject = data.subject || "その他"; // 教科フィールド
+        const subject = data.subject || "その他";
         
-        let totalCorrect = 0;
-        let totalCount = 0;
+        if (!subjectGroups[subject]) {
+          subjectGroups[subject] = [];
+        }
+        subjectGroups[subject].push({ id: doc.id, ...data });
+      });
 
-        questions.forEach((q, idx) => {
-          const log = logs[idx];
-          if(log) {
-            const c = log.correct || 0;
-            const w = log.wrong || 0;
-            if((c + w) > 0) {
-              totalCorrect += c;
-              totalCount += (c + w);
-            }
-          }
-        });
+      // 教科ごとにDOMを構築
+      Object.keys(subjectGroups).forEach((subName) => {
+        const quizList = subjectGroups[subName];
+        
+        const groupEl = document.createElement("div");
+        groupEl.className = "subject-group";
+        groupEl.id = `group_${subName}`;
 
-        const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
-
-        const rowItem = document.createElement("div");
-        rowItem.className = "quiz-row-item";
-        rowItem.id = `row_${doc.id}`;
-        if (quizDocId === doc.id) rowItem.classList.add("active");
-
-        rowItem.innerHTML = `
-          <div class="quiz-row-header">
-            <div class="quiz-row-left">
-              <div class="quiz-row-title-container">
-                <span class="subject-badge">${escapeHtml(subject)}</span>
-                <span class="quiz-row-title">${escapeHtml(title)}</span>
-                <span class="select-status-badge">選択中</span>
-              </div>
-              <div class="quiz-row-meta">
-                収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
-              </div>
+        groupEl.innerHTML = `
+          <div class="subject-header">
+            <div class="subject-title-left">
+              <span>${escapeHtml(subName)}</span>
+              <span class="subject-count-tag">${quizList.length}個の問題集</span>
             </div>
+            <button class="toggle-btn sub-toggle-btn">∨</button>
           </div>
+          <div class="subject-items-container"></div>
         `;
-        
-        rowItem.onclick = () => {
-          selectQuiz(doc.id);
-          quizSelectCard.classList.add("collapsed");
-          mainQuizToggleBtn.textContent = "^";
+
+        const itemsContainer = groupEl.querySelector(".subject-items-container");
+        const subToggleBtn = groupEl.querySelector(".sub-toggle-btn");
+
+        // 教科ヘッダーをクリックしたら開閉
+        groupEl.querySelector(".subject-header").onclick = (e) => {
+          // ボタン自体のクリックイベントと重複させないためのケア
+          const isOpen = groupEl.classList.contains("open");
+          if (isOpen) {
+            groupEl.classList.remove("open");
+            subToggleBtn.textContent = "∨";
+          } else {
+            groupEl.classList.add("open");
+            subToggleBtn.textContent = "^";
+          }
         };
 
-        quizGrid.appendChild(rowItem);
+        // 教科内の各問題集を追加
+        quizList.forEach((quizData) => {
+          const questions = quizData.questions || [];
+          const logs = quizData.logs || {};
+          const qCount = questions.length;
+          const title = quizData.title || "無題の問題集";
+
+          let totalCorrect = 0;
+          let totalCount = 0;
+
+          questions.forEach((q, idx) => {
+            const log = logs[idx];
+            if(log) {
+              const c = log.correct || 0;
+              const w = log.wrong || 0;
+              if((c + w) > 0) {
+                totalCorrect += c;
+                totalCount += (c + w);
+              }
+            }
+          });
+
+          const accuracy = totalCount === 0 ? 0 : Math.round((totalCorrect / totalCount) * 100);
+
+          const rowItem = document.createElement("div");
+          rowItem.className = "quiz-row-item";
+          rowItem.id = `row_${quizData.id}`;
+          if (quizDocId === quizData.id) {
+            rowItem.classList.add("active");
+            groupEl.classList.add("open"); // 選択中の問題集がある教科は最初から開く
+            subToggleBtn.textContent = "^";
+          }
+
+          rowItem.innerHTML = `
+            <div class="quiz-row-header">
+              <div class="quiz-row-left">
+                <div class="quiz-row-title-container">
+                  <span class="quiz-row-title">${escapeHtml(title)}</span>
+                  <span class="select-status-badge">選択中</span>
+                </div>
+                <div class="quiz-row-meta">
+                  収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
+                </div>
+              </div>
+            </div>
+          `;
+
+          rowItem.onclick = (e) => {
+            e.stopPropagation(); // 教科ヘッダーの開閉イベントを防止
+            selectQuiz(quizData.id);
+            quizSelectCard.classList.add("collapsed");
+            mainQuizToggleBtn.textContent = "^";
+          };
+
+          itemsContainer.appendChild(rowItem);
+        });
+
+        quizGrid.appendChild(groupEl);
       });
+
     } catch(err) {
       console.error(err);
       quizGrid.innerHTML = '<div style="text-align: center; color: var(--bad); padding: 20px;">問題集の一覧取得に失敗しました</div>';
