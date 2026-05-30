@@ -158,7 +158,7 @@ h2{
 
 .quiz-row-item.active {
   border-color: var(--primary);
-  background: rgba(99,102,241,0.02);
+  background: var(--card); /* デフォルトのactive時の微背景色を無効化 */
 }
 
 .quiz-row-header {
@@ -752,7 +752,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
             rowItem.style.borderColor = hexToRgba(baseColor, 0.15);
           }
 
-          // 【修正】アクティブ（選択中）になった際、「選択中バッジ」の背景色、および枠線やカード背景に教科のカラーを適用する処理
           if (quizDocId === quizData.id) {
             rowItem.classList.add("active");
             groupEl.classList.add("open");
@@ -760,7 +759,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
             
             if(baseColor) {
               rowItem.style.borderColor = baseColor;
-              rowItem.style.backgroundColor = hexToRgba(baseColor, 0.05);
+              rowItem.style.backgroundColor = "var(--card)"; // 【修正】選択中の時でも背景色は濃くせず、白（var(--card)）を維持
             }
           }
 
