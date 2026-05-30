@@ -19,10 +19,10 @@
   --bar-bg:#e2e8f0;
   
   /* 暗記モード用カラー */
-  --rank1:#f59e0b; /* 黄色 */
-  --rank2:#84cc16; /* 黄緑色 */
-  --rank3:#22c55e; /* 緑色 */
-  --rank0:#cbd5e1; /* 未達成（灰色） */
+  --rank1:#f59e0b;
+  --rank2:#84cc16;
+  --rank3:#22c55e;
+  --rank0:#cbd5e1;
 }
 
 @media (prefers-color-scheme: dark){
@@ -75,7 +75,6 @@ h2{
   position: relative;
 }
 
-/* 問題集選択カード自体の折りたたみヘッダー */
 .quiz-select-header {
   display: flex;
   align-items: center;
@@ -95,7 +94,6 @@ h2{
   margin-top: 0;
 }
 
-/* 1行ずつの問題集リストUI */
 .quiz-list-container {
   display: flex;
   flex-direction: column;
@@ -131,8 +129,15 @@ h2{
 .quiz-row-left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex-grow: 1;
+}
+
+.quiz-row-title-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .quiz-row-title {
@@ -140,9 +145,23 @@ h2{
   font-weight: bold;
   color: var(--text);
   word-break: break-all;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+}
+
+/* 教科バッジスタイル */
+.subject-badge {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+@media (prefers-color-scheme: dark){
+  .subject-badge {
+    background: #334155;
+    color: #cbd5e1;
+  }
 }
 
 .quiz-row-meta {
@@ -150,7 +169,6 @@ h2{
   color: var(--sub);
 }
 
-/* 選択中バッジ */
 .select-status-badge {
   background: var(--primary);
   color: white;
@@ -164,7 +182,6 @@ h2{
   display: inline-block;
 }
 
-/* 全体共通のトグルボタン */
 .toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -185,7 +202,6 @@ h2{
   color: var(--primary);
 }
 
-/* 振動アニメーション */
 .shake {
   animation: shakeAnim 0.4s ease-in-out;
 }
@@ -233,7 +249,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   color:white;
 }
 
-/* 単元リスト */
 .unit-list {
   display: flex;
   flex-direction: column;
@@ -303,7 +318,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   transition: width 0.3s ease;
 }
 
-/* 5問ごとの複合スタックバー用スタイル */
 .stacked-bar-container {
   display: flex;
   width: 100%;
@@ -382,7 +396,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   justify-content:center;
 }
 
-/* クイズ画面用 */
 .question{
   text-align:center;
   font-size:52px;
@@ -439,7 +452,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   margin-top:8px;
 }
 
-/* 判定ポップアップエフェクト */
 .effect-overlay {
   position: absolute;
   top: 50%; left: 50%;
@@ -466,7 +478,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   border-radius:18px; padding:14px; margin-bottom:12px;
 }
 
-/* システム通知用モーダル */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -564,7 +575,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   let streak = 0;
   let results = [];
   let misses = [];
-  let totalCountGlobal = 0; 
   let nextTimer = null;
 
   // 暗記モード用管理状態
@@ -592,15 +602,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   };
 
   window.addEventListener("DOMContentLoaded", fetchQuizList);
-  window.addEventListener("DOMContentLoaded", loadGlobalCount);
-
-  function loadGlobalCount() {
-    const savedGlobalCount = localStorage.getItem("userQuizTotalCount");
-    if(savedGlobalCount) totalCountGlobal = parseInt(savedGlobalCount);
-  }
-  function saveGlobalCount() {
-    localStorage.setItem("userQuizTotalCount", totalCountGlobal);
-  }
 
   async function fetchQuizList() {
     try {
@@ -618,6 +619,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         const logs = data.logs || {}; 
         const qCount = questions.length;
         const title = data.title || "無題の問題集";
+        const subject = data.subject || "その他"; // 教科フィールド
         
         let totalCorrect = 0;
         let totalCount = 0;
@@ -644,8 +646,9 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         rowItem.innerHTML = `
           <div class="quiz-row-header">
             <div class="quiz-row-left">
-              <div class="quiz-row-title">
-                <span>${escapeHtml(title)}</span>
+              <div class="quiz-row-title-container">
+                <span class="subject-badge">${escapeHtml(subject)}</span>
+                <span class="quiz-row-title">${escapeHtml(title)}</span>
                 <span class="select-status-badge">選択中</span>
               </div>
               <div class="quiz-row-meta">
@@ -675,7 +678,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const activeRow = document.getElementById(`row_${id}`);
     if(activeRow) activeRow.classList.add("active");
 
-    const titleText = activeRow.querySelector('.quiz-row-title span').textContent;
+    const titleText = activeRow.querySelector('.quiz-row-title').textContent;
     appArea.innerHTML = `<div class="card" style="text-align: center; color: var(--sub);">クラウドから「${titleText}」を読み込んでいます...</div>`;
 
     try {
@@ -773,11 +776,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       <div class="card" id="maxCountContainer">
         <h2>最大出題数</h2>
         <input type="number" id="count" placeholder="指定なし（全問出題）">
-      </div>
-
-      <div class="card" style="background: rgba(99,102,241,0.04);">
-        <div style="font-size: 15px; color: var(--sub);">累計システム解答回数</div>
-        <div style="font-size: 32px; font-weight: bold; margin-top: 4px;">${totalCountGlobal} <span style="font-size:16px; font-weight:normal;">回</span></div>
       </div>
 
       <div class="button-row center">
@@ -915,13 +913,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     let randomWeight = Math.random() * totalWeight;
     currentMemorizeQuestion = activePool[0]; 
 
-    for (let item of itemsWithWeight) {
-      randomWeight -= item.weight;
-      if (randomWeight <= 0) {
-        currentMemorizeQuestion = item.q;
-        break;
-      }
-    }
+    for (let item of itemsWithWeight) { randomWeight -= item.weight; if (randomWeight <= 0) { currentMemorizeQuestion = item.q; break; } }
 
     const currentSuccess = memorizeSuccessLogs[currentMemorizeQuestion.originalIdx];
     let rankBadge = `<span class="badge" style="background:var(--rank0); color:#1e293b;">未達成</span>`;
@@ -960,8 +952,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const user = input.value.trim();
     if(!user) return;
 
-    totalCountGlobal += 1;
-    saveGlobalCount();
     sessionAnsweredCount += 1; 
 
     const q = currentMemorizeQuestion;
@@ -1027,7 +1017,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     nextBtn.onclick = handleMemorizeNextStep;
     window.addEventListener("keydown", handleEnterNext);
 
-    // 正解の時は1秒後に自動遷移を予約
     if(correct) {
       nextTimer = setTimeout(handleMemorizeNextStep, 1000);
     }
@@ -1165,9 +1154,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(!input) return;
     const user = input.value.trim();
     if(!user) return; 
-
-    totalCountGlobal += 1;
-    saveGlobalCount();
 
     const q = quiz.questions[index];
     const original = originalQuiz.questions[q.originalIdx];
