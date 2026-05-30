@@ -127,7 +127,7 @@ h2{
 .subject-count-tag {
   font-size: 12px;
   background: var(--border);
-  color: var(--primary2); /* JavaScriptで教科色に動的変更されます */
+  color: var(--primary2);
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: bold;
@@ -692,7 +692,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           groupEl.style.backgroundColor = bgSoft;
         }
 
-        // 【修正】「.subject-count-tag」の文字色（color）と背景色のみに教科カラーを反映。その他の要素やボタンはデフォルトのまま維持
         groupEl.innerHTML = `
           <div class="subject-header" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.05)}"` : ''}>
             <div class="subject-title-left">
@@ -753,6 +752,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
             rowItem.style.borderColor = hexToRgba(baseColor, 0.15);
           }
 
+          // 【修正】アクティブ（選択中）になった際、「選択中バッジ」の背景色、および枠線やカード背景に教科のカラーを適用する処理
           if (quizDocId === quizData.id) {
             rowItem.classList.add("active");
             groupEl.classList.add("open");
@@ -769,7 +769,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
               <div class="quiz-row-left">
                 <div class="quiz-row-title-container">
                   <span class="quiz-row-title">${escapeHtml(title)}</span>
-                  <span class="select-status-badge">選択中</span>
+                  <span class="select-status-badge" ${baseColor ? `style="background: ${baseColor}; color: white;"` : ''}>選択中</span>
                 </div>
                 <div class="quiz-row-meta">
                   収録数: ${qCount}問 | 解答履歴: ${totalCount}回 ${totalCount > 0 ? `(総合正答率: ${accuracy}%)` : '(未挑戦)'}
