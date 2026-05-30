@@ -187,6 +187,15 @@ button:hover { opacity: 0.9; }
   align-self: center;
 }
 
+/* 教科設定エリアのスタイル補正 */
+.subject-setup-group {
+  background: rgba(99,102,241,0.02);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
 @media(max-width:640px){
   body{ padding: 10px; }
   .card{ padding: 16px; }
@@ -214,6 +223,18 @@ button:hover { opacity: 0.9; }
 
 <div class="card">
   <h2>問題集の設定・保存・削除</h2>
+  
+  <div class="subject-setup-group">
+    <label for="subjectSelect">教科（大枠のグループ）</label>
+    <select id="subjectSelect">
+      <option value="">-- 読込中 --</option>
+    </select>
+
+    <div id="newSubjectContainer" style="display: none; margin-top: 10px;">
+      <label for="newSubjectInput" style="color: var(--primary);">✨ 新しい教科名を入力</label>
+      <input type="text" id="newSubjectInput" placeholder="例: 歴史、理科、基本情報技術者 など" style="margin-bottom: 0;">
+    </div>
+  </div>
   
   <label for="quizTitle">問題集のタイトル（選択メニューにこの名前が並びます）</label>
   <input type="text" id="quizTitle" placeholder="例: 日本地理マスタークイズ">
@@ -270,6 +291,7 @@ button:hover { opacity: 0.9; }
   let questions = [];
   let editIndex = null;
   let currentLoadedDocId = null; 
+  let globalSubjects = []; // クラウド上に存在する全教科のリスト
 
   // イベント設定
   document.getElementById("mainBtn").onclick = handleMain;
@@ -277,20 +299,40 @@ button:hover { opacity: 0.9; }
   document.getElementById("cloudSaveBtn").onclick = saveToFirebase;
   document.getElementById("cloudLoadBtn").onclick = loadFromFirebase;
   document.getElementById("cloudDeleteBtn").onclick = deleteFromFirebase;
+  
+  // 教科のセレクトボックス変更時の連動
+  document.getElementById("subjectSelect").onchange = (e) => {
+    const container = document.getElementById("newSubjectContainer");
+    if (e.target.value === "__NEW__") {
+      container.style.display = "block";
+      document.getElementById("newSubjectInput").focus();
+    } else {
+      container.style.display = "none";
+    }
+  };
 
-  window.addEventListener("DOMContentLoaded", refreshQuizList);
+  window.addEventListener("DOMContentLoaded", async () => {
+    await refreshQuizList();
+  });
 
+  // 問題集のドロップダウンおよび「教科リスト」をまとめて更新
   async function refreshQuizList() {
     const select = document.getElementById("quizSelect");
+    const subSelect = document.getElementById("subjectSelect");
+    
     select.innerHTML = '<option value="">⏳ 読み込み中...</option>';
+    subSelect.innerHTML = '<option value="">⏳ 読み込み中...</option>';
     
     try {
       const querySnapshot = await getDocs(collection(db, "quizzes"));
       select.innerHTML = '';
       
+      const subjectSet = new Set();
+
       if(querySnapshot.empty) {
         select.innerHTML = '<option value="">クラウド上に問題集がありません</option>';
         document.getElementById("cloudDeleteBtn").style.display = "none";
+        buildSubjectSelect(subjectSet, null);
         return;
       }
 
@@ -301,16 +343,61 @@ button:hover { opacity: 0.9; }
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        
+        // 存在する教科を収集
+        if (data.subject) {
+          subjectSet.add(data.subject.trim());
+        }
+
         const opt = document.createElement("option");
         opt.value = doc.id; 
         opt.textContent = data.title || "無題の問題集";
         if(currentLoadedDocId === doc.id) opt.selected = true; 
         select.appendChild(opt);
       });
+
+      globalSubjects = Array.from(subjectSet);
+      
+      // 現在ロードされている問題集の教科、あるいは選択されていた教科を維持
+      const currentSelectedSub = subSelect.value;
+      buildSubjectSelect(subjectSet, currentSelectedSub);
+
     } catch(err) {
       console.error(err);
       select.innerHTML = '<option value="">❌ リストの一覧取得に失敗しました</option>';
+      subSelect.innerHTML = '<option value="">❌ 取得失敗</option>';
     }
+  }
+
+  // 教科セレクトボックスを生成するヘルパー
+  function buildSubjectSelect(subjectSet, activeSubject) {
+    const subSelect = document.getElementById("subjectSelect");
+    const previousValue = subSelect.value;
+    subSelect.innerHTML = "";
+
+    const defaultSubOpt = document.createElement("option");
+    defaultSubOpt.value = "";
+    defaultSubOpt.textContent = "-- 教科を選択してください (必須) --";
+    subSelect.appendChild(defaultSubOpt);
+
+    subjectSet.forEach(sub => {
+      const opt = document.createElement("option");
+      opt.value = sub;
+      opt.textContent = sub;
+      if (sub === activeSubject) opt.selected = true;
+      subSelect.appendChild(opt);
+    });
+
+    const newSubOpt = document.createElement("option");
+    newSubOpt.value = "__NEW__";
+    newSubOpt.textContent = "➕ 新しい教科を入力する...";
+    if (activeSubject === "__NEW__" || (previousValue === "__NEW__" && !activeSubject)) {
+      newSubOpt.selected = true;
+    }
+    subSelect.appendChild(newSubOpt);
+
+    // 表示切り替えトリガーを叩く
+    subSelect.dispatchEvent(new Event('change'));
   }
 
   function handleMain(){
@@ -434,7 +521,21 @@ button:hover { opacity: 0.9; }
      ========================================= */
   async function saveToFirebase() {
     const title = document.getElementById("quizTitle").value.trim();
+    const subSelect = document.getElementById("subjectSelect");
     const msgEl = document.getElementById("statusMsg");
+
+    // 教科の決定ロジック
+    let subject = "";
+    if (subSelect.value === "__NEW__") {
+      subject = document.getElementById("newSubjectInput").value.trim();
+    } else {
+      subject = subSelect.value.trim();
+    }
+
+    if(!subject) {
+      alert("教科を選択するか、新しい教科名を入力してください。");
+      return;
+    }
 
     if(!title) {
       alert("問題集のタイトルを入力してください");
@@ -447,18 +548,35 @@ button:hover { opacity: 0.9; }
     try {
       const docId = currentLoadedDocId || "quiz_" + Date.now();
 
+      // ロード済みの古いデータがある場合は既存のログ（解答履歴）を破壊しないよう、
+      // 事前に最新状態を取得してマージ、あるいは元データを引き継ぐ設計
+      let existingLogs = {};
+      if (currentLoadedDocId) {
+        const snap = await getDoc(doc(db, "quizzes", currentLoadedDocId));
+        if (snap.exists()) {
+          existingLogs = snap.data().logs || {};
+        }
+      }
+
       await setDoc(doc(db, "quizzes", docId), {
         title: title,
-        questions: questions
+        subject: subject,
+        questions: questions,
+        logs: existingLogs // 履歴データを保持
       });
 
       currentLoadedDocId = docId;
       msgEl.textContent = "✅ クラウド保存完了！";
       msgEl.style.color = "var(--good)";
       
-      // 削除ボタンを表示させる
+      document.getElementById("newSubjectInput").value = "";
       document.getElementById("cloudDeleteBtn").style.display = "inline-block";
+      
+      // 更新後にリストと教科一覧を再構築（保存した教科が選択状態を維持するように引き渡す）
       await refreshQuizList();
+      document.getElementById("subjectSelect").value = subject;
+      document.getElementById("subjectSelect").dispatchEvent(new Event('change'));
+
     } catch (error) {
       console.error(error);
       msgEl.textContent = "❌ 保存失敗。";
@@ -481,7 +599,14 @@ button:hover { opacity: 0.9; }
         document.getElementById("quizTitle").value = data.title || "";
         currentLoadedDocId = docId; 
 
-        // 読み込みが成功したら削除ボタンを表示
+        // 教科データの流し込み
+        const targetSubject = data.subject || "その他";
+        
+        // 教科リスト（Set）に読み込んだ教科が存在しない場合は強制追加して再構築
+        const subjectSet = new Set(globalSubjects);
+        subjectSet.add(targetSubject);
+        buildSubjectSelect(subjectSet, targetSubject);
+
         document.getElementById("cloudDeleteBtn").style.display = "inline-block";
 
         questions = data.questions || [];
@@ -494,8 +619,8 @@ button:hover { opacity: 0.9; }
         editIndex = null;
         cancelEdit();
         render();
-        document.getElementById("statusMsg").textContent = ""; // メッセージリセット
-        alert(`📂 「${data.title}」をロードしました（全 ${questions.length} 問）`);
+        document.getElementById("statusMsg").textContent = "";
+        alert(`📂 「${data.title}」をロードしました（教科: ${targetSubject} / 全 ${questions.length} 問）`);
       }
     } catch (error) {
       console.error(error);
@@ -516,17 +641,16 @@ button:hover { opacity: 0.9; }
     msgEl.style.color = "var(--sub)";
 
     try {
-      // クラウドのドキュメントを削除
       await deleteDoc(doc(db, "quizzes", currentLoadedDocId));
 
       msgEl.textContent = "🗑️ 削除が完了しました";
       msgEl.style.color = "var(--bad)";
 
-      // 各種入力をクリアして初期状態に戻す
       currentLoadedDocId = null;
       questions = [];
       document.getElementById("quizTitle").value = "";
       document.getElementById("cloudDeleteBtn").style.display = "none";
+      document.getElementById("newSubjectInput").value = "";
       
       cancelEdit();
       render();
