@@ -627,10 +627,10 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     const isCollapsed = quizSelectCard.classList.contains("collapsed");
     if (isCollapsed) {
       quizSelectCard.classList.remove("collapsed");
-      mainQuizToggleBtn.textContent = "∨";
+      mainQuizToggleBtn.textContent = "∨"; // 展開時は下向き
     } else {
       quizSelectCard.classList.add("collapsed");
-      mainQuizToggleBtn.textContent = "^";
+      mainQuizToggleBtn.textContent = "^"; // 収納（折りたたみ）時は上向き
     }
   };
 
@@ -667,13 +667,14 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         groupEl.className = "subject-group";
         groupEl.id = `group_${subName}`;
 
+        // 初期は閉じているので「^」
         groupEl.innerHTML = `
           <div class="subject-header">
             <div class="subject-title-left">
               <span>${escapeHtml(subName)}</span>
               <span class="subject-count-tag">${quizList.length}個の問題集</span>
             </div>
-            <button class="toggle-btn sub-toggle-btn">∨</button>
+            <button class="toggle-btn sub-toggle-btn">^</button>
           </div>
           <div class="subject-items-container"></div>
         `;
@@ -683,14 +684,13 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
         // 教科ヘッダーをクリックしたら開閉
         groupEl.querySelector(".subject-header").onclick = (e) => {
-          // ボタン自体のクリックイベントと重複させないためのケア
           const isOpen = groupEl.classList.contains("open");
           if (isOpen) {
             groupEl.classList.remove("open");
-            subToggleBtn.textContent = "∨";
+            subToggleBtn.textContent = "^"; // 閉じている時は上向き
           } else {
             groupEl.classList.add("open");
-            subToggleBtn.textContent = "^";
+            subToggleBtn.textContent = "∨"; // 展開している時は下向き
           }
         };
 
@@ -724,7 +724,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           if (quizDocId === quizData.id) {
             rowItem.classList.add("active");
             groupEl.classList.add("open"); // 選択中の問題集がある教科は最初から開く
-            subToggleBtn.textContent = "^";
+            subToggleBtn.textContent = "∨";
           }
 
           rowItem.innerHTML = `
