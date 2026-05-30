@@ -121,15 +121,16 @@ h2{
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text); /* 文字色は常に通常のUIの黒（ダークモード時は白）に固定 */
+  color: var(--text);
 }
 
 .subject-count-tag {
   font-size: 12px;
   background: var(--border);
-  color: var(--primary2);
+  color: var(--primary2); /* デフォルト値。JavaScript側で教科の色に上書きされます */
   padding: 2px 8px;
   border-radius: 999px;
+  font-weight: bold;
 }
 
 .subject-items-container {
@@ -328,7 +329,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   align-items: center;
   font-size: 16px;
   font-weight: bold;
-  color: var(--text); /* 単元名も文字色を固定 */
+  color: var(--text);
 }
 
 .unit-rate {
@@ -670,7 +671,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         subjectGroups[subject].quizzes.push({ id: doc.id, ...data });
       });
 
-      // 【修正】「その他」が必ず一番最後（下）に来るようにソート
       const sortedSubjectNames = Object.keys(subjectGroups).sort((a, b) => {
         if (a === "その他") return 1;
         if (b === "その他") return -1;
@@ -694,12 +694,12 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
           groupEl.style.backgroundColor = bgSoft;
         }
 
-        // 【修正】「style="color: ${baseColor}"」を削除し、文字色はCSS標準（黒ベース）に固定
+        // 【修正】「.subject-count-tag」部分に教科カラーの文字色を動的に設定（未指定時はデフォルト色）
         groupEl.innerHTML = `
           <div class="subject-header" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.05)}"` : ''}>
             <div class="subject-title-left">
               <span>${escapeHtml(subName)}</span>
-              <span class="subject-count-tag" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.12)}; color: var(--primary2);"` : ''}>${quizList.length}個の問題集</span>
+              <span class="subject-count-tag" style="${baseColor ? `background: ${hexToRgba(baseColor, 0.12)}; color: ${baseColor};` : 'background: var(--border); color: var(--primary2);'}">${quizList.length}個の問題集</span>
             </div>
             <button class="toggle-btn sub-toggle-btn" ${baseColor ? `style="border-color: ${hexToRgba(baseColor, 0.3)}; color: var(--sub);"` : ''}>^</button>
           </div>
