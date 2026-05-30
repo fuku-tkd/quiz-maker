@@ -121,6 +121,7 @@ h2{
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--text); /* 文字色は常に通常のUIの黒（ダークモード時は白）に固定 */
 }
 
 .subject-count-tag {
@@ -327,6 +328,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
   align-items: center;
   font-size: 16px;
   font-weight: bold;
+  color: var(--text); /* 単元名も文字色を固定 */
 }
 
 .unit-rate {
@@ -534,6 +536,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 .bad{color:var(--bad);}
 
 @media(max-width:640px){
+  body{ padding: 10px; }
   h1{font-size:26px;}
   .question{font-size:36px;}
   .button-row>*{width:100%;}
@@ -630,7 +633,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
 
   window.addEventListener("DOMContentLoaded", fetchQuizList);
 
-  // HEXカラー(#ffffff)を、透過度を指定したrgba形式へマージする便利関数
   function hexToRgba(hex, alpha) {
     if (!hex || !hex.startsWith('#')) return null;
     const c = hex.substring(1);
@@ -658,48 +660,48 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         
         if (!subjectGroups[subject]) {
           subjectGroups[subject] = {
-            color: data.subjectColor || null, // 各問題集からカラーを取得
+            color: data.subjectColor || null, 
             quizzes: []
           };
         }
-        // もしカラーが未設定のドキュメントがあれば、設定されているドキュメントのカラーを優先
         if (data.subjectColor && !subjectGroups[subject].color) {
           subjectGroups[subject].color = data.subjectColor;
         }
         subjectGroups[subject].quizzes.push({ id: doc.id, ...data });
       });
 
+      // 【修正】「その他」が必ず一番最後（下）に来るようにソート
       const sortedSubjectNames = Object.keys(subjectGroups).sort((a, b) => {
         if (a === "その他") return 1;
-        if (b === "other") return -1;
+        if (b === "その他") return -1;
         return a.localeCompare(b, 'ja');
       });
 
       sortedSubjectNames.forEach((subName) => {
         const groupData = subjectGroups[subName];
         const quizList = groupData.quizzes;
-        const baseColor = groupData.color; // 例: "#4f46e5"
+        const baseColor = groupData.color; 
 
         const groupEl = document.createElement("div");
         groupEl.className = "subject-group";
         groupEl.id = `group_${subName}`;
 
-        // カラー設定があれば、今のUI風に馴染むように薄めて適用
         if (baseColor) {
-          const bgSoft = hexToRgba(baseColor, 0.03);     // 背景はほんのり3%
-          const borderSoft = hexToRgba(baseColor, 0.25); // 枠線は25%
+          const bgSoft = hexToRgba(baseColor, 0.03);     
+          const borderSoft = hexToRgba(baseColor, 0.25); 
           
           groupEl.style.borderColor = borderSoft;
           groupEl.style.backgroundColor = bgSoft;
         }
 
+        // 【修正】「style="color: ${baseColor}"」を削除し、文字色はCSS標準（黒ベース）に固定
         groupEl.innerHTML = `
           <div class="subject-header" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.05)}"` : ''}>
             <div class="subject-title-left">
-              <span ${baseColor ? `style="color: ${baseColor}"` : ''}>${escapeHtml(subName)}</span>
-              <span class="subject-count-tag" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.15)}; color: ${baseColor};"` : ''}>${quizList.length}個の問題集</span>
+              <span>${escapeHtml(subName)}</span>
+              <span class="subject-count-tag" ${baseColor ? `style="background: ${hexToRgba(baseColor, 0.12)}; color: var(--primary2);"` : ''}>${quizList.length}個の問題集</span>
             </div>
-            <button class="toggle-btn sub-toggle-btn" ${baseColor ? `style="border-color: ${hexToRgba(baseColor, 0.3)}; color: ${baseColor};"` : ''}>^</button>
+            <button class="toggle-btn sub-toggle-btn" ${baseColor ? `style="border-color: ${hexToRgba(baseColor, 0.3)}; color: var(--sub);"` : ''}>^</button>
           </div>
           <div class="subject-items-container"></div>
         `;
@@ -805,7 +807,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       el.style.borderColor = "";
     });
     
-    // リスト再構築を呼んでカラー反映状態をカチッと合わせる
     await fetchQuizList();
 
     const activeRow = document.getElementById(`row_${id}`);
@@ -842,7 +843,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     
     if(!originalQuiz) return;
 
-    // 現在選択されている教科のベースカラー
     const baseColor = originalQuiz.subjectColor || null;
 
     const stats = {};
@@ -860,7 +860,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       const s = stats[cat] || { correct: 0, total: 0 };
       const rate = s.total === 0 ? 0 : Math.round((s.correct / s.total) * 100);
       
-      // 単元カードの背景・枠線も教科カラーに馴染ませる
       let customLabelStyle = "";
       let customBarStyle = "";
       if (baseColor) {
@@ -900,7 +899,7 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
         <div class="unit-list">
           <label class="unit-row-label" style="background:transparent; border:none; padding:4px 0;">
             <input type="checkbox" id="checkAll" checked ${baseColor ? `style="accent-color:${baseColor}"`:''}>
-            <div class="unit-info" style="font-weight:bold;">すべて選択 / 解除</div>
+            <div class="unit-info" style="font-weight:bold; color:var(--text);">すべて選択 / 解除</div>
           </label>
           <hr style="width:100%; border:0; border-top:1px dashed var(--border); margin:4px 0;">
           
@@ -925,12 +924,10 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
       </div>
     `;
 
-    // 読み込み後にカスタムバーの幅を固定処理
     appArea.querySelectorAll(".bar[data-rate]").forEach(bar => {
       bar.style.width = bar.dataset.rate + "%";
     });
 
-    // モード選択ボタンのカラーフック
     appArea.querySelectorAll("[data-mode]").forEach(el=>{
       if (baseColor && el.classList.contains("active")) {
         el.style.background = baseColor;
@@ -1080,7 +1077,6 @@ select:focus, input[type="text"]:focus, input[type="number"]:focus {
     if(currentSuccess === 1) rankBadge = `<span class="badge" style="background:var(--rank1); color:white;">1回正解</span>`;
     if(currentSuccess === 2) rankBadge = `<span class="badge" style="background:var(--rank2); color:white;">2回正解</span>`;
 
-    // プレイ中画面のメインカード枠線も、設定色があれば馴染ませる
     let cardCustomStyle = "";
     if(baseColor) {
       cardCustomStyle = `style="border-color: ${hexToRgba(baseColor, 0.3)}; background-color: ${hexToRgba(baseColor, 0.01)}"`;
