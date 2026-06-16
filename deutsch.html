@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ドイツ語初級 口頭試験シミュレーター</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #0f172a; color: #f8fafc; }
+    </style>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- CONSTANTS & DATA ---
+        const SUBJECTS = [
+          { id: 'du', label: 'du (きみ)', pronoun: 'du', verbEnding: 'st' },
+          { id: 'Sie', label: 'Sie (あなた/敬称)', pronoun: 'Sie', verbEnding: 'en' },
+          { id: 'ihr', label: 'ihr (きみたち)', pronoun: 'ihr', verbEnding: 't' },
+          { id: 'er', label: 'er (彼)', pronoun: 'er', verbEnding: 't' },
+          { id: 'sie_sg', label: 'sie (彼女)', pronoun: 'sie', verbEnding: 't' },
+          { id: 'Maria', label: 'Maria (マリア)', pronoun: 'Maria', verbEnding: 't' },
+          { id: 'wir', label: 'wir (私たち)', pronoun: 'wir', verbEnding: 'en' }
+        ];
+
+        const THEMES = [
+          { id: 'Herkunft', label: 'Herkunft (出身)', qWord: 'Woher', verb: 'kommen', preposition: 'aus', jpLabel: '出身について質問する' },
+          { id: 'Wohnort', label: 'Wohnort (居住地)', qWord: 'Wo', verb: 'wohnen', preposition: 'in', jpLabel: '住んでいる場所について質問する' },
+          { id: 'Name', label: 'Name (名前)', qWord: 'Wie', verb: 'heißen', preposition: '', jpLabel: '名前について質問する' }
+        ];
+
+        const CITIES = [
+          { name: 'Bonn', country: 'Deutschland' },
+          { name: 'Tokio', country: 'Japan' },
+          { name: 'Berlin', country: 'Deutschland' },
+          { name: 'Kyoto', country: 'Japan' },
+          { name: 'München', country: 'Deutschland' },
+          { name: 'Hamburg', country: 'Deutschland' }
+        ];
+
+        function conjugate(verb, subjectId) {
+          if (verb === 'kommen') {
+            if (subjectId === 'du') return 'kommst';
+            if (subjectId === 'Sie' || subjectId === 'wir') return 'kommen';
+            if (subjectId === 'ihr' || subjectId === 'er' || subjectId === 'sie_sg' || subjectId === 'Maria') return 'kommt';
+          }
+          if (verb === 'wohnen') {
+            if (subjectId === 'du') return 'wohnst';
+            if (subjectId === 'Sie' || subjectId === 'wir') return 'wohnen';
+            if (subjectId === 'ihr' || subjectId === 'er' || subjectId === 'sie_sg' || subjectId === 'Maria') return 'wohnt';
+          }
+          if (verb === 'heißen') {
+            if (subjectId === 'du') return 'heißt';
+            if (subjectId === 'Sie' || subjectId === 'wir') return 'heißen';
+            if (subjectId === 'ihr' || subjectId === 'er' || subjectId === 'sie_sg' || subjectId === 'Maria') return 'heißt';
+          }
+          return verb;
+        }
+
+        function App() {
+          const [activeTab, setActiveTab] = React.useState('practice-q');
+          
+          // Round 1 & 2
+          const [themeCard, setThemeCard] = React.useState(THEMES[0]);
+          const [subjectCard, setSubjectCard] = React.useState(SUBJECTS[0]);
+          const [userQuestion, setUserQuestion] = React.useState('');
+          const [qFeedback, setQFeedback] = React.useState(null);
+          
+          // Round 3
+          const [q3Theme, setQ3Theme] = React.useState(THEMES[0]);
+          const [q3Subject, setQ3Subject] = React.useState(SUBJECTS[0]);
+          const [q3City, setQ3City] = React.useState(CITIES[0]);
+          const [userAnswer, setUserAnswer] = React.useState('');
+          const [aFeedback, setAFeedback] = React.useState(null);
+          const [score, setScore] = React.useState({ correct: 0, total: 0 });
+
+          const speakGerman = (text) => {
+            if ('speechSynthesis' in window) {
+              const utterance = new SpeechSynthesisUtterance(text);
+              utterance.lang = 'de-DE';
+              window.speechSynthesis.speak(utterance);
+            }
+          };
+
+          const drawQuestionCards = () => {
+            setQFeedback(null);
+            setUserQuestion('');
+            setThemeCard(THEMES[Math.floor(Math.random() * THEMES.length)]);
+            setSubjectCard(SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)]);
+          };
+
+          const checkQuestionAnswer = () => {
+            const correctVerb = conjugate(themeCard.verb, subjectCard.id);
+            const correctAnswer = `${themeCard.qWord} ${correctVerb} ${subjectCard.pronoun}?`;
+            const isCorrect = userQuestion.trim().toLowerCase().replace(/\?+$/, '') === correctAnswer.toLowerCase().replace(/\?+$/, '');
+            
+            setQFeedback({
+              isCorrect,
+              correctAnswer,
+              explanation: `動詞 ${themeCard.verb} は、主語が ${subjectCard.label} のとき「${correctVerb}」に変化します。`
+            });
+            setScore(prev => ({ ...prev, correct: prev.correct + (isCorrect ? 1 : 0), total: prev.total + 1 }));
+          };
+
+          const drawAnswerQuestion = () => {
+            setAFeedback(null);
+            setUserAnswer('');
+            setQ3Theme(THEMES[Math.floor(Math.random() * 2)]); // Exclude 'Name'
+            setQ3Subject(SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)]);
+            setQ3City(CITIES[Math.floor(Math.random() * CITIES.length)]);
+          };
+
+          const getTeacherQuestionText = () => {
+            return `${q3Theme.qWord} ${conjugate(q3Theme.verb, q3Subject.id)} ${q3Subject.pronoun}?`;
+          };
+
+          const checkAnswerMode = () => {
+            const prep = q3Theme.id === 'Wohnort' ? 'in' : 'aus';
+            let options = [];
+            
+            if (q3Subject.id === 'du' || q3Subject.id === 'Sie') {
+              options.push(`Ich ${conjugate(q3Theme.verb, 'ich')} ${prep} ${q3City.name}.`);
+            } else if (q3Subject.id === 'ihr') {
+              options.push(`Wir ${conjugate(q3Theme.verb, 'wir')} ${prep} ${q3City.name}.`);
+            } else {
+              options.push(`${q3Subject.pronoun} ${conjugate(q3Theme.verb, q3Subject.id)} ${prep} ${q3City.name}.`);
+            }
+
+            const isCorrect = options.some(opt => userAnswer.trim().toLowerCase().replace(/\.+$/, '') === opt.toLowerCase().replace(/\.+$/, ''));
+
+            setAFeedback({ isCorrect, correctAnswers: options });
+            setScore(prev => ({ ...prev, correct: prev.correct + (isCorrect ? 1 : 0), total: prev.total + 1 }));
+          };
+
+          React.useEffect(() => {
+            drawQuestionCards();
+            drawAnswerQuestion();
+          }, []);
+
+          return (
+            <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
+              {/* HEADER */}
+              <header className="bg-slate-800 border-b border-slate-700 shadow-md">
+                <div className="max-w-4xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-tr from-yellow-500 via-red-500 to-black rounded-xl">
+                      <span className="text-lg font-black text-white">DE</span>
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-bold text-yellow-400">ドイツ語初級 口頭試験対策</h1>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700 text-sm">
+                    正解率: <span className="font-bold text-indigo-400">{score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%</span> ({score.correct}/{score.total})
+                  </div>
+                </div>
+              </header>
+
+              {/* TABS */}
+              <nav className="bg-slate-800/50 border-b border-slate-700">
+                <div className="max-w-4xl mx-auto px-4 flex gap-2">
+                  <button onClick={() => setActiveTab('practice-q')} className={`py-3 px-4 text-sm font-semibold border-b-2 ${activeTab === 'practice-q' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400'}`}>【1・2回目】質問作成</button>
+                  <button onClick={() => setActiveTab('practice-a')} className={`py-3 px-4 text-sm font-semibold border-b-2 ${activeTab === 'practice-a' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400'}`}>【3回目】質問応答</button>
+                  <button onClick={() => setActiveTab('grammar')} className={`py-3 px-4 text-sm font-semibold border-b-2 ${activeTab === 'grammar' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400'}`}>文法チートシート</button>
+                </div>
+              </nav>
+
+              {/* MAIN CONTENT */}
+              <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 space-y-6">
+                
+                {activeTab === 'practice-q' && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
+                        <span className="text-xs text-slate-500 block">1枚目: テーマ</span>
+                        <span className="text-xl font-bold text-rose-400 block mt-2">{themeCard.label}</span>
+                      </div>
+                      <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
+                        <span className="text-xs text-slate-500 block">2枚目: 主語</span>
+                        <span className="text-2xl font-black text-rose-400 block mt-1">{subjectCard.pronoun}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                      <input 
+                        type="text" 
+                        value={userQuestion} 
+                        onChange={(e) => setUserQuestion(e.target.value)}
+                        placeholder="ドイツ語の疑問文を入力..." 
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={checkQuestionAnswer} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-sm">判定する</button>
+                        <button onClick={drawQuestionCards} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 font-bold rounded-xl text-sm等">次のカード</button>
+                      </div>
+
+                      {qFeedback && (
+                        <div className={`p-4 rounded-xl border ${qFeedback.isCorrect ? 'bg-emerald-950/40 border-emerald-800' : 'bg-rose-950/40 border-rose-800'}`}>
+                          <p className="font-bold">{qFeedback.isCorrect ? '⭕ 正解！' : '❌ 違うよ！'}</p>
+                          <p className="font-mono text-lg text-indigo-300 mt-1">正解: {qFeedback.correctAnswer}</p>
+                          <button onClick={() => speakGerman(qFeedback.correctAnswer)} className="mt-2 text-xs bg-indigo-600 px-3 py-1 rounded">🔊 音声を聴く</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'practice-a' && (
+                  <div className="space-y-6">
+                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                        <div>
+                          <span className="text-xs text-rose-400 font-bold block">先生からの質問:</span>
+                          <span className="text-xl font-mono font-bold">{getTeacherQuestionText()}</span>
+                          <span className="text-xs text-slate-500 block mt-1">(お題の都市: {q3City.name})</span>
+                        </div>
+                        <button onClick={() => speakGerman(getTeacherQuestionText())} className="p-2 bg-rose-600/20 text-rose-400 rounded-lg">🔊</button>
+                      </div>
+
+                      <input 
+                        type="text" 
+                        value={userAnswer} 
+                        onChange={(e) => setUserAnswer(e.target.value)}
+                        placeholder="解答をフルセンテンスで入力..." 
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={checkAnswerMode} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-sm">回答する</button>
+                        <button onClick={drawAnswerQuestion} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 font-bold rounded-xl text-sm">次の質問</button>
+                      </div>
+
+                      {aFeedback && (
+                        <div className={`p-4 rounded-xl border ${aFeedback.isCorrect ? 'bg-emerald-950/40 border-emerald-800' : 'bg-rose-950/40 border-rose-800'}`}>
+                          <p className="font-bold">{aFeedback.isCorrect ? '⭕ 正解！ Sehr gut!' : '❌ 違う変化になっていないか確認！'}</p>
+                          <p className="font-mono text-indigo-300 mt-1">模範解答例: {aFeedback.correctAnswers.join(' / ')}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'grammar' && (
+                  <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                    <h3 className="font-bold border-b border-slate-700 pb-2 text-yellow-400">最重要ルールまとめ</h3>
+                    <p className="text-sm text-slate-300">① 出身を聞くときは <strong>kommen + aus</strong> / 住む場所は <strong>wohnen + in</strong></p>
+                    <p className="text-sm text-slate-300">② 主語が <strong>ich</strong> → 語尾は <strong>-e</strong> / <strong>du</strong> → 語尾は <strong>-st</strong></p>
+                  </div>
+                )}
+
+              </main>
+            </div>
+          );
+        }
+
+        const root = tragedies = tragedies = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
