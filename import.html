@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firestore JSON 一括インポーター</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #1e293b;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --border: #e2e8f0;
+    --good: #16a34a;
+    --bad: #dc2626;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 20px;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    max-width: 700px;
+    width: 100%;
+    background: var(--card);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  }
+  h1 {
+    font-size: 20px;
+    margin-top: 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .info-box {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 25px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  button {
+    display: block;
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover {
+    background: var(--primary-hover);
+  }
+  button:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+  }
+  #statusLog {
+    margin-top: 25px;
+    padding: 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    white-space: pre-wrap;
+    display: none;
+  }
+  .success { background: #f0fdf4; border: 1px solid #bbf7d0; color: var(--good); }
+  .error { background: #fef2f2; border: 1px solid #fecaca; color: var(--bad); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🚀 Firestore JSONデータ一括インポーター</h1>
+  
+  <div class="info-box">
+    <strong>保存内容のプレビュー:</strong><br>
+    • <b>タイトル:</b> 明治初期から韓国併合までの歴史問題集<br>
+    • <b>教科:</b> 歴史<br>
+    • <b>問題数:</b> 80問<br>
+    • <b>保存先ドキュメントID:</b> quiz_history_modern
+  </div>
+
+  <button id="importBtn">🔥 このJSONデータをFirestoreに保存する</button>
+
+  <div id="statusLog"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // editor.html と共通の Firebase 設定
+  const firebaseConfig = {
+    apiKey: "AIzaSyCV2acb2e09L-2iedCJPJtEpsoN8i8L4v0",
+    authDomain: "quiz-maker-6259f.firebaseapp.com",
+    projectId: "quiz-maker-6259f",
+    storageBucket: "quiz-maker-6259f.firebasestorage.app",
+    messagingSenderId: "671224317335",
+    appId: "1:671224317335:web:24baa4a56291ea19a630d2",
+    measurementId: "G-0Q8ZKMS07B"
+  };
+
+  // 初始化 Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // 流し込む対象のデータオブジェクト
+  const quizData = {
+    "title": "明治初期から韓国併合までの歴史問題集",
+    "subject": "歴史",
+    "subjectColor": "#4f46e5",
+    "questions": [
+      {
+        "question": "1871年、政府の一元化と税制・度量衡の統一のために断行され、各藩に藩札の回収などを求めた政策は何ですか。",
+        "answer": "廃藩置県",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "廃藩置県の際、藩収入の何％を海軍費として納入することが命じられましたか。",
+        "answer": "45％",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "中小藩が廃藩を願い出たのに対し、廃藩の断行を強く論じた山口藩（長州藩）の人物は誰ですか。",
+        "answer": "鳥尾小弥太",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1871年7月、3府302県からスタートした廃藩置県は、1888年には3府何県に整理されましたか。",
+        "answer": "43県",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1872年、政府が国民の動向を把握し、動かせるようにするために編纂された戸籍を何といいますか。",
+        "answer": "壬申戸籍",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1871年、日本と清の間で結ばれた、相互に領事裁判権を認め、協定関税を定めた対等な条約は何ですか。",
+        "answer": "日清修好条規",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1871年〜1873年に欧米へ派遣され、条約改正の予備交渉や諸国の制度・文物調査を目的とした使節団を何といいますか。",
+        "answer": "岩倉使節団",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "岩倉使節団の特命全権大使を務めたのは誰ですか。",
+        "answer": "岩倉具視",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "岩倉使節団に同行した女子留学生の一人で、のちに女子英学塾（津田塾大学）を創設した人物は誰ですか。",
+        "answer": "津田梅子",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "岩倉使節団に同行した女子留学生の一人で、ノートに「津田梅子」ともう一人記載されている人物は誰ですか。",
+        "answer": "山川捨松",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "アメリカ側から条約改正の条件として提示された、「他国が日本より良い条件を得た場合、アメリカにも自動的にそれが適用される」という不平等な規定（片務的最愛国待遇に関わるもの）を何といいますか。",
+        "answer": "片務的最恵国待遇",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "ドイツ（プロイセン）の首相で、大久保利通の「富国論」や西郷隆盛の「強兵論」に大きな影響を与えた人物は誰ですか。",
+        "answer": "ビスマルク",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "明治政府より前の近世（江戸時代）において、琉球王国を実質的に支配していたのは何藩ですか。",
+        "answer": "薩摩藩",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "中国（清）の皇帝が周辺国の首長に官号や爵位を与え、君臣関係を結ぶ外交秩序を何といいますか。",
+        "answer": "華夷秩序",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "「琉球の両属関係をなくす」と言い放ち、琉球処分を推し推めた内務卿は誰ですか。",
+        "answer": "大久保利通",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1874年、清国の了解なしに「琉球藩」を設置した明治政府が、西郷従道率いる日本軍を出兵させた地域はどこですか。",
+        "answer": "台湾",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "処分官として琉球に赴き、清に対して琉球藩を日本専属と表明し、琉球に対しては清との国交断絶を要求した人物は誰ですか。",
+        "answer": "松田道之",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "西郷隆盛らが主張した、武力をもって朝鮮を開国させようとする論を何といいますか。",
+        "answer": "征韓論",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1875年、ロシアとの間で国境問題を解決するために結ばれた、樺太をロシア領、千島列島を日本領とした条約は何ですか。",
+        "answer": "樺太・千島交換条約",
+        "unit": "第1章：明治初期の外交と国内の基礎固め（1871年〜1875年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1875年、日本政府が軍艦を派遣し、江華島付近で朝鮮の守備兵と交戦した事件を何といいますか。",
+        "answer": "江華島事件",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "江華島事件を契機に、1876年に結ばれた日朝間の不平等条約は何ですか。",
+        "answer": "日朝修好条規",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮の閔氏政権が推進した、新式軍隊を組織するなどの近代化政策を何といいますか。",
+        "answer": "開化政策",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1882年、新式軍隊との差別に不満を持った朝鮮の旧軍兵士が起こした反乱は何ですか。",
+        "answer": "壬午軍乱",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "壬午軍乱により、朝鮮政府で一時実権を奪還した国王の父は誰ですか。",
+        "answer": "大院君",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "壬午軍乱の際、日本公使館が襲撃されたため、長崎まで逃げ延びた当時の日本公使は誰ですか。",
+        "answer": "花房義質",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "壬午軍乱の結果、日本と朝鮮の間で結ばれた、犯人処罰や見舞金の支払いなどを規定した条約は何ですか。",
+        "answer": "済物浦条約",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1884年、金玉均らの独立党（開化派）が日本軍の援助を受けて王宮を制圧したものの、清軍に圧倒されて3日で失敗に終わった政変を何といいますか。",
+        "answer": "甲申政変",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "甲申政変に関わった独立党（開化派）の指導者で、ノートに記載されている人物は誰ですか。",
+        "answer": "金玉均",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "甲申政変の際、日本国内の自由民権運動派が「清に断固たる処置を！」と叫び、福沢諭吉の社説のタイトルにもなった対外強硬論を何といいますか。",
+        "answer": "脱亜論",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1885年、大井憲太郎らが朝鮮の独立党を支援して混乱を起こそうと計画し、逮捕された事件を何といいますか。",
+        "answer": "大阪事件",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "甲申政変の後、1885年に伊藤博文と李鴻章の間で結ばれた、日清両軍の朝鮮からの撤兵などを定めた条約は何ですか。",
+        "answer": "天津条約",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "天津条約で、将来朝鮮へ派兵する際に日清両国間で義務付けられたルールは何ですか。",
+        "answer": "事前通告",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "天津条約以降、日本に代わって朝鮮へ影響力を強めていった列強国はどこですか。",
+        "answer": "ロシア",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮国内で、日本商人による米や大豆の買い漁りに対抗して発令された、穀物の輸出禁止命令を何といいますか。",
+        "answer": "防穀令",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1894年、朝鮮国内で「東学」の信仰を背景に民衆が起こした大規模な反乱を何といいますか。",
+        "answer": "甲午農民戦争",
+        "unit": "第2章：日朝関係の緊迫と日清戦争への道（1875年〜1894年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "外務卿として税権回復（関税自主権の獲得）を目指したものの、治外法権撤廃の優先論による批判を受けて辞任した人物は誰ですか。",
+        "answer": "寺島宗則",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "外相として治外法権の廃止を目指し、外国人判事の任用妥協案や、外国人への欧化政策アピールを行った人物は誰ですか。",
+        "answer": "井上馨",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "井上馨外相の妥協案に対し、「外国人判事の任用は国家主権を損なう」と批判した、フランス人の政府顧問は誰ですか。",
+        "answer": "ボアソナード",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "井上馨が条約改正のために、外国人へのアピールとして大舞踏会などを開催した施設は何ですか。",
+        "answer": "鹿鳴館",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1886年, 英国の貨物船が難破し、日本人乗客のみが溺死したにもかかわらず英国人船長が軽い罪で済んだため、条約改正要求が激化する契機となった事件は何ですか。",
+        "answer": "ノルマントン号事件",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "外相として、外国人判事の任用などを条件に交渉を進めたものの、国内で大反対が起きて爆弾テロに遭い、右脚を切断して辞任した人物は誰ですか。",
+        "answer": "大隈重信",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "外相として交渉を進めたものの、来日中のロシア皇太子が警察官の津田三蔵に切りつけられる事件（大津事件）が起きたことで辞任した人物は誰ですか。",
+        "answer": "青木周蔵",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "外相として、1894年についに領事裁判権（治外法権）の撤廃に成功した人物は誰ですか。",
+        "answer": "陸奥宗光",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "陸奥宗光外相のもと、1894年7月に調印された、治外法権撤廃と関税率の一部引き上げを定めた条約は何ですか。",
+        "answer": "日英通商航海条約",
+        "unit": "第3章：明治期の条約改正交渉",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日清戦争に関する、外相・陸奥宗光の回想録のタイトルを何といいますか。",
+        "answer": "蹇蹇録",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日清戦争中、戦争指導の最高統帥機関として、広島などに設置された組織は何ですか。",
+        "answer": "大本営",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1000年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日清戦争を「正義の戦い」と報じ、国民の主戦論を煽った、ノートに記載のある新聞は何ですか。",
+        "answer": "筑紫新聞",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日清戦争の陸戦において、日本軍が勝利を収めた主な戦いは何の戦いですか。",
+        "answer": "平壌の戦い",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日清戦争の海戦において、日本軍が勝利を収めた主な戦いは何の海戦ですか。",
+        "answer": "黄海海戦",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1895年、日清戦争の講和条約として結ばれた条約は何ですか。",
+        "answer": "下関条約",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "下関条約によって、清から日本へ割譲された半島はどこですか。",
+        "answer": "遼東半島",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "下関条約によって、清から日本へ割譲された島々のうち、「台湾全島」ともう一つはどこですか。",
+        "answer": "澎湖諸島",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "下関条約で、清が日本に支払うことになった賠償金はいくらですか。",
+        "answer": "2億テール",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "下関条約により開港された、長江沿いの港（都市）のうち、ノートに記載されている2つの都市はどこですか。",
+        "answer": "重慶・杭州",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "下関条約の直後、ロシア・フランス・ドイツの3国が、日本に対して遼東半島を清国に返還するよう勧告した事件を何といいますか。",
+        "answer": "三国干渉",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "三国干渉に対し、日本国内で「耐え忍んで国力を蓄えよう」という標語として流行した四字熟語は何ですか。",
+        "answer": "臥薪嘗胆",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日本の三浦梧楼公使らが関与して起こした、親日派を追放しようとしていた朝鮮王妃を殺害した事件は何ですか。",
+        "answer": "閔妃殺害事件",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "閔妃殺害事件の後、身の危険を感じた国王の高宗が避難した、どこの国の公使館ですか。",
+        "answer": "ロシア公使館",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1897年、高宗が国号を改め、自ら皇帝に即位して成立した国は何ですか。",
+        "answer": "大韓帝国",
+        "unit": "第4章：日清戦争から列強の中国分割（1894年〜1900年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1900年、中国（清）で発生した、「扶清滅洋」をスローガンとした排外主義運動を何といいますか。",
+        "answer": "義和団事件",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "義和団事件の際、列強の連合軍において、最も多い出兵人数（6500人）を出した国はどこですか。",
+        "answer": "日本",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "義和団事件の後、清国と列強の間で結ばれた、賠償金の支払いなどを認めた議定書は何ですか。",
+        "answer": "北京議定書",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "義和団事件後、ロシアが東清鉄道破壊を理由に軍事占領し、撤兵しなかったため日露関係悪化の原因となった地域はどこですか。",
+        "answer": "東三省",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1902年、ロシアの南下政策に対抗するため、日本とイギリスの間で結ばれた同盟は何ですか。",
+        "answer": "日英同盟",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "与謝野晶子が、旅順の戦闘に参加していた弟を思って『明星』に発表した反戦詩のタイトルは何ですか。",
+        "answer": "君死にたまふこと勿れ",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "日露開戦を強く主張した、戸水寛人ら7人の博士による建白書は何ですか。",
+        "answer": "七博士意見書",
+        "unit": "第5章：義和団事件と日露戦争前夜（1900年〜1904年）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1904年2月、日露戦争開戦直後に結ばれ、韓国領内で日本軍の行動の自由を認めた規定は何ですか。",
+        "answer": "日韓議定書",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "第一次日韓協約に基づき、財務顧問として韓国に派遣された日本人は誰ですか。",
+        "answer": "目賀田種太郎",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1905年8月に改定され、イギリスが日本の韓国保護国化を承認した同盟条約は何ですか。",
+        "answer": "第二次日英同盟",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1905年11月に結ばれ、韓国の外交権を没収して保護国化した協約は何ですか。",
+        "answer": "第二次日韓協約",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "第二次日韓協約に基づき、漢城（ソウル）に設置された統治機関は何ですか。",
+        "answer": "統監府",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "統監府の初代統監に就任した人物は誰ですか。",
+        "answer": "伊藤博文",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1907年、韓国皇帝の高宗が、第二次日韓協約の無効を国際社会に訴えるためにオランダへ密使を派遣した事件を何といいますか。",
+        "answer": "ハーグ密使事件",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "ハーグ密使事件の後、1907年7月に結ばれ、韓国の内政全般の権限を没収した協約は何ですか。",
+        "answer": "第三次日韓協約",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "第三次日韓協約の付随命令により解散させられた、韓国の組織は何ですか。",
+        "answer": "韓国軍",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "軍隊解散を機に、韓国各地で巻き起こった激しい武装反日運動を何といいますか。",
+        "answer": "義兵運動",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1909年10月、ハルビン駅で初代統監の伊藤博文を暗殺した、義兵運動の指導者は誰ですか。",
+        "answer": "安重根",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1910年8月、日本が韓国を完全に領有し、大韓帝国を滅亡させた出来事を何といいますか。",
+        "answer": "韓国併合",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "韓国併合にともない、従来の統監府に代わって設置され、朝鮮全土の支配権を握った機関は何ですか。",
+        "answer": "朝鮮総督府",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "初代朝鮮総督に就任した、陸軍大将の人物は誰ですか。",
+        "answer": "寺内正毅",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮総督の権限のうち、独自の法律を制定できる権限を何といいますか。",
+        "answer": "制令発布権",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮総督の権限のうち、行政全般を執行する権限を何といいますか。",
+        "answer": "政務総理権",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代")",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮総督の権限のうち、軍隊を統率する権限を何といいますか。",
+        "answer": "陸海軍統帥権",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮総督府のもと、憲兵警察が強大な権限を持って臨んだ、当時の強圧的な統治体制を何といいますか。",
+        "answer": "武断政治",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮総督府が実施した言論弾圧のなかで、唯一発行が許可された、日本人が経営する新聞社は何ですか。",
+        "answer": "京城日報",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "1910年代に実施された、土地の所有者を確定して地価を決定する一方、多くの共有地を国有地化した事業を何といいますか。",
+        "answer": "土地調査事業",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "朝鮮の人々に日本式の「氏（苗字）」を名乗ることを強制した政策を何といいますか。",
+        "answer": "創氏改名",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      },
+      {
+        "question": "創氏改名を拒否した人々に対して、子供の入学拒否や総督府への採用不可など、日常的に加えられた圧力を何といいますか。",
+        "answer": "日常停圧力",
+        "unit": "第6章：韓国併合と植民地統治（1904年〜1910年代）",
+        "stats": { "correct": 0, "wrong": 0 },
+        "statsHistory": []
+      }
+    ],
+    "logs": {}
+  };
+
+  const btn = document.getElementById("importBtn");
+  const log = document.getElementById("statusLog");
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    log.style.display = "block";
+    log.className = "";
+    log.textContent = "⏳ Firestoreへデータを保存中...";
+
+    // 内部的な識別IDを自動決定
+    const docId = "quiz_history_modern";
+
+    try {
+      // quizzes コレクションに書き込み
+      await setDoc(doc(db, "quizzes", docId), quizData);
+      
+      log.className = "success";
+      log.textContent = `🎉 一括インポートが正常に完了しました！\n\n・保存先ドキュメントID: ${docId}\n・問題集タイトル: ${quizData.title}\n・問題数: ${quizData.questions.length}問\n\nもう片方の「問題集制作エディタ (editor.html)」を開いて、「歴史」の教科を選択すれば、この問題集を読み込んで編集・管理が可能です。`;
+    } catch (error) {
+      console.error(error);
+      log.className = "error";
+      log.textContent = `❌ 保存中にエラーが発生しました。\n\n【詳細】\n${error.message}\n\nFirebaseのセキュリティルール（書き込み権限など）を確認してください。`;
+      btn.disabled = false;
+    }
+  };
+</script>
+
+</body>
+</html>
